@@ -16,7 +16,7 @@ ENFORCE_SEMICOLON
 #define RETURN_ON_BAD_STATUS(expression, returnValue) RETURN_ON_CONDITION(!NT_SUCCESS(expression), returnValue)
 
 #define RETURN_STATUS_ON_BAD_STATUS(expression) {	\
-	NTSTATUS _status = expression;					\
+	const NTSTATUS _status = expression;					\
 	RETURN_ON_BAD_STATUS(_status, _status);			\
 }													\
 ENFORCE_SEMICOLON
@@ -24,8 +24,8 @@ ENFORCE_SEMICOLON
 #define RETURN_ON_BAD_RESULT(expression, returnValue) RETURN_ON_BAD_STATUS(expression.getStatus(), returnValue)
 
 #define RETURN_RESULT_ON_BAD_RESULT(expression) {	\
-	const auto _result = expression;				\
-	RETURN_ON_BAD_STATUS(_result, _result);			\
+	auto _result = expression;						\
+	RETURN_ON_BAD_RESULT(_result, _result);			\
 }													\
 ENFORCE_SEMICOLON
 

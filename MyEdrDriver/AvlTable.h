@@ -23,23 +23,16 @@ public:
 
 	bool deleteElement(const DataType& data);
 
-	DataType& findElement(const DataType& data);
+	DataType* findElement(const DataType& data) const;
+
+	bool containsElement(const DataType& data) const;
 
 	void clear();
 
 private:
-#pragma pack(push)
-#pragma pack(1)
-	struct AvlTableEntry
-	{
-		RTL_AVL_TABLE AvlTable;
-		DataType Data;
-	};
-#pragma pack(pop)
-
 	RTL_AVL_TABLE m_table;
 
-	static RTL_GENERIC_COMPARE_RESULTS __stdcall compareAvlTableEntries(const PRTL_AVL_TABLE table, const DataType* first, const DataType* second);
+	static RTL_GENERIC_COMPARE_RESULTS __stdcall compareAvlTableEntries(const PRTL_AVL_TABLE table, const DataType** first, const DataType** second);
 	static PVOID __stdcall allocate(const PRTL_AVL_TABLE table, CLONG byteCount);
 	static void __stdcall free(const PRTL_AVL_TABLE table, PVOID buffer);
 };
@@ -73,43 +66,65 @@ bool AvlTable<DataType>::insertElement(const DataType& data)
 template<typename DataType>
 bool AvlTable<DataType>::insertElement(DataType&& data)
 {
-	AutoDeletedPointer<DataType> copiedData = new DataType{ move(data) };
-	RETURN_ON_CONDITION(nullptr == copiedData, false);
-	*copiedData = move(data);
-	RETURN_ON_CONDITION(nullptr == RtlInsertElementGenericTableAvl(&m_table, copiedData.get(), sizeof(DataType), nullptr), false);
-	copiedData.release();
+	AutoDeletedPointer<DataType> movedData = new DataType{ move(data) };
+	RETURN_ON_CONDITION(nullptr == movedData, false);
+	RETURN_ON_CONDITION(nullptr == RtlInsertElementGenericTableAvl(&m_table, &movedData.get(), sizeof(DataType*), nullptr), false);
+	movedData.release();
 	return true;
 }
 
 template<typename DataType>
 bool AvlTable<DataType>::deleteElement(const DataType& data)
 {
-	return RtlDeleteElementGenericTableAvl(&m_table, const_cast<PVOID>(&data));
+	AutoDeletedPointer<DataType> foundData = findElement(data);
+	RETURN_ON_CONDITION(nullptr == foundData, false);
+	DEBUG_PRINT("%u, %u", data, *foundData);
+	return RtlDeleteElementGenericTableAvl(&m_table, &foundData);
 }
 
 template<typename DataType>
-DataType& AvlTable<DataType>::findElement(const DataType& data)
+DataType* AvlTable<DataType>::findElement(const DataType& data) const
 {
-	return *static_cast<DataType*>(RtlLookupElementGenericTableAvl(&m_table, const_cast<PVOID>(data)));
+	const DataType* pData = &data;
+	DataType** foundData = static_cast<DataType**>(RtlLookupElementGenericTableAvl(
+		const_cast<PRTL_AVL_TABLE>(&m_table),
+		const_cast<DataType**>(&pData)
+	));
+	RETURN_ON_CONDITION(nullptr == foundData, nullptr);
+	return *foundData;
+}
+
+template<typename DataType>
+bool AvlTable<DataType>::containsElement(const DataType& data) const
+{
+	return nullptr != findElement(data);
 }
 
 template<typename DataType>
 void AvlTable<DataType>::clear()
 {
+	DataType** data = static_cast<DataType**>(RtlEnumerateGenericTableAvl(&m_table, TRUE));
+
+	while (nullptr != data) {
+		deleteElement(**data);
+		data = static_cast<DataType**>(RtlEnumerateGenericTableAvl(&m_table, TRUE));
+	}
 }
 
 template<typename DataType>
-RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRTL_AVL_TABLE table, const DataType* first, const DataType* second)
+RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRTL_AVL_TABLE table, const DataType** first, const DataType** second)
 {
 	UNREFERENCED_PARAMETER(table);
 
+	DEBUG_PRINT("%u, %u", **first, **second);
+
 	RTL_GENERIC_COMPARE_RESULTS compareResult;
 
-	if (*first < *second)
+	if (**first < **second)
 	{
 		compareResult = GenericLessThan;
 	}
-	else if (*first > *second)
+	else if (**first > **second)
 	{
 		compareResult = GenericGreaterThan;
 	}
@@ -118,7 +133,6 @@ RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRT
 		compareResult = GenericEqual;
 	}
 
-	DEBUG_PRINT("%p, %p, %p, %u", table, first, second, compareResult);
 	return compareResult;
 }
 
@@ -128,7 +142,6 @@ PVOID AvlTable<DataType>::allocate(const PRTL_AVL_TABLE table, const CLONG byteC
 	UNREFERENCED_PARAMETER(table);
 
 	PVOID buffer = ::allocate(byteCount);
-	DEBUG_PRINT("%p, %u, %p", table, byteCount, buffer);
 	return buffer;
 }
 
@@ -137,6 +150,7 @@ void AvlTable<DataType>::free(const PRTL_AVL_TABLE table, PVOID buffer)
 {
 	UNREFERENCED_PARAMETER(table);
 
-	DEBUG_PRINT("%p, %p", table, buffer);
+	DEBUG_PRINT("%u", **reinterpret_cast<ULONG**>(static_cast<PRTL_BALANCED_LINKS>(buffer) + 1));
+
 	::free(buffer);
 }

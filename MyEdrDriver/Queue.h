@@ -26,8 +26,8 @@ public:
 	bool isEmpty() const;
 	bool isFull() const;
 
-	Result<DataType> pushTail(const DataType& data);
-	Result<DataType> pushTail(DataType&& data);
+	NTSTATUS pushTail(const DataType& data);
+	NTSTATUS pushTail(DataType&& data);
 
 	Result<DataType> popHead();
 
@@ -99,14 +99,14 @@ bool Queue<DataType>::isFull() const
 }
 
 template<typename DataType>
-Result<DataType> Queue<DataType>::pushTail(const DataType& data)
+NTSTATUS Queue<DataType>::pushTail(const DataType& data)
 {
 	DataType copiedData = data;
 	return pushTail(move(copiedData));
 }
 
 template<typename DataType>
-Result<DataType> Queue<DataType>::pushTail(DataType&& data)
+NTSTATUS Queue<DataType>::pushTail(DataType&& data)
 {
 	RETURN_ON_CONDITION(isFull(), STATUS_MY_EDR_QUEUE_IS_FULL);
 
@@ -119,7 +119,7 @@ Result<DataType> Queue<DataType>::pushTail(DataType&& data)
 	//// Release the queue entry so it will no be deallocated at the end of this scope
 	queueEntry.release();
 
-	return { STATUS_SUCCESS };
+	return STATUS_SUCCESS;
 }
 
 template<typename DataType>
