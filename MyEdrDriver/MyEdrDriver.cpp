@@ -23,7 +23,6 @@ NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX pro
 
 struct MyEdrData final
 {
-    PDRIVER_OBJECT DriverObject;
     Queue<AutoDeletedPointer<MyEdrEvent>> EventQueue;
     AvlTable<ULONG> BlacklistProcessIds;
     Mutex Mutex;
@@ -37,6 +36,11 @@ struct MyEdrData final
         decltype(FltUnregisterFilter),
         FltUnregisterFilter
     > Filter;
+    AutoDeletedPointer<
+        DEVICE_OBJECT,
+        decltype(IoDeleteDevice),
+        IoDeleteDevice
+    > Device;
 };
 
 MyEdrData* g_myEdrData{ nullptr };
@@ -165,25 +169,65 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostWrite(
     return HandleFilterCallback(FileWrite, Data);
 }
 
-void DriverUnload(
-    DRIVER_OBJECT * DriverObject
+NTSTATUS
+MyEdrCreateClose(
+    PDEVICE_OBJECT deviceObject,
+    PIRP irp
 )
 {
-    UNREFERENCED_PARAMETER(DriverObject);
+    UNREFERENCED_PARAMETER(deviceObject);
+
+    irp->IoStatus.Status = STATUS_SUCCESS;
+    irp->IoStatus.Information = 0;
+
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS MyEdrDeviceControl(
+    PDEVICE_OBJECT deviceObject,
+    PIRP irp
+)
+{
+    UNREFERENCED_PARAMETER(deviceObject);
+
+    const Lock lock(g_myEdrData->Mutex);
+    const PIO_STACK_LOCATION irpStackLocation = IoGetCurrentIrpStackLocation(irp);
+
+    switch (irpStackLocation->Parameters.DeviceIoControl.IoControlCode)
+    {
+    case SYSCTL_GET_VERSION:
+        break;
+    case SYSCTL_GET_EVENTS:
+        break;
+    case SYSCTL_ADD_BLACK:
+        break;
+    default:
+        return STATUS_INVALID_DEVICE_REQUEST;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+void DriverUnload(
+    DRIVER_OBJECT* driverObject
+)
+{
+    UNREFERENCED_PARAMETER(driverObject);
 
     delete g_myEdrData;
 }
 
 extern "C" NTSTATUS DriverEntry(
-    PDRIVER_OBJECT DriverObject,
-    PUNICODE_STRING RegistryPath
+    PDRIVER_OBJECT driverObject,
+    PUNICODE_STRING registryPath
 )
 {
-    UNREFERENCED_PARAMETER(DriverObject);
-    UNREFERENCED_PARAMETER(RegistryPath);
+    UNREFERENCED_PARAMETER(driverObject);
+    UNREFERENCED_PARAMETER(registryPath);
 
     AutoDeletedPointer<MyEdrData> myEdrData = new MyEdrData {
-        DriverObject,
         { MAX_EVENT_QUEUE_ENTRY_COUNT }
     };
 
@@ -218,14 +262,30 @@ extern "C" NTSTATUS DriverEntry(
     };
 
     RETURN_STATUS_ON_BAD_STATUS(FltRegisterFilter(
-        DriverObject,
+        driverObject,
         &FilterRegistration,
         &myEdrData->Filter.get()
     ));
 
     RETURN_STATUS_ON_BAD_STATUS(FltStartFiltering(myEdrData->Filter.get()));
+
+    UNICODE_STRING deviceName;
+    RtlInitUnicodeString(&deviceName, MY_EDR_DEVICE_NAME);
+    RETURN_STATUS_ON_BAD_STATUS(IoCreateDevice(
+        driverObject,
+        0,
+        &deviceName,
+        FILE_DEVICE_UNKNOWN,
+        FILE_DEVICE_SECURE_OPEN,
+        FALSE,
+        &myEdrData->Device.get()
+    ));
+
+    driverObject->DriverUnload = DriverUnload;
+    driverObject->MajorFunction[IRP_MJ_CLOSE] = driverObject->MajorFunction[IRP_MJ_CREATE] = MyEdrCreateClose;
+    driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = MyEdrDeviceControl;
+
     myEdrData.release();
 
-    DriverObject->DriverUnload = DriverUnload;
     return STATUS_SUCCESS;
 }
