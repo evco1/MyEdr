@@ -35,7 +35,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CreateProcessNotifyRoutine.cpp" />
     <ClCompile Include="Mutex.cpp" />
     <ClCompile Include="Memory.cpp" />
     <ResourceCompile Include="MyEdrDriver.rc" />
@@ -232,16 +231,17 @@
     <ClInclude Include="AutoDeletedPointer.h" />
     <ClInclude Include="AvlTable.h" />
     <ClInclude Include="Concepts.h" />
-    <ClInclude Include="CreateProcessNotifyRoutine.h" />
     <ClInclude Include="Lock.h" />
     <ClInclude Include="Mutex.h" />
     <ClInclude Include="Debug.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="MyEdrEvent.h" />
+    <ClInclude Include="RemovePointer.h" />
+    <ClInclude Include="Result.h" />
     <ClInclude Include="Statuses.h" />
     <ClInclude Include="Move.h" />
     <ClInclude Include="Queue.h" />
-    <ClInclude Include="Result.h" />
+    <ClInclude Include="TypeTraits.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

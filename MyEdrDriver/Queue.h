@@ -32,7 +32,7 @@ public:
 
 	Result<DataType> popHead();
 
-	Result<> clear();
+	NTSTATUS clear();
 
 private:
 #pragma pack(push)
@@ -135,7 +135,7 @@ Result<DataType> Queue<DataType>::popHead()
 }
 
 template<typename DataType>
-Result<> Queue<DataType>::clear()
+NTSTATUS Queue<DataType>::clear()
 {
 	NTSTATUS status;
 

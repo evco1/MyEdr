@@ -4,18 +4,20 @@
 
 #include <wdm.h>
 
+#pragma warning(disable: 4180)
+
 template<
 	typename DataType,
 	UINT32 Tag = MY_EDR_DATA_DEFAULT_TAG,
 	typename DeleterType = void(DataType* pointer),
-	DeleterType* Deleter = DefaultDelete
+	DeleterType* Deleter = free
 >
 class AutoDeletedPointer final
 {
 public:
 	AutoDeletedPointer(const AutoDeletedPointer&) = delete;
 	AutoDeletedPointer(AutoDeletedPointer&& other);
-	AutoDeletedPointer(DataType* data = nullptr, DeleterType* deleter = DefaultDelete);
+	AutoDeletedPointer(DataType* data = nullptr, DeleterType* deleter = ::free);
 
 	~AutoDeletedPointer();
 
@@ -23,19 +25,18 @@ public:
 	AutoDeletedPointer& operator=(AutoDeletedPointer&& other);
 	AutoDeletedPointer& operator=(DataType* data);
 
-	const DataType& operator*() const;
+ 	const DataType& operator*() const;
 	DataType& operator*();
 
 	const DataType* operator->() const;
 	DataType* operator->();
 
-	NTSTATUS allocate(size_t dataSize = sizeof(DataType));
 	bool isAllocated() const;
+	NTSTATUS allocate(size_t dataSize = sizeof(DataType));
+	void free();
 
 	const DataType* get() const;
 	DataType*& get();
-
-	void free();
 
 	DataType* release();
 
@@ -166,6 +167,17 @@ template<
 	typename DeleterType,
 	DeleterType* Deleter
 >
+bool AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::isAllocated() const
+{
+	return m_data != nullptr;
+}
+
+template<
+	typename DataType,
+	UINT32 Tag,
+	typename DeleterType,
+	DeleterType* Deleter
+>
 NTSTATUS AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::allocate(size_t dataSize)
 {
 	if (isAllocated())
@@ -173,7 +185,7 @@ NTSTATUS AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::allocate(size_
 		return STATUS_SUCCESS;
 	}
 	
-	m_data = DefaultAllocate<DataType, Tag>(dataSize);
+	m_data = ::allocate<DataType, Tag>(dataSize);
 
 	if (nullptr == m_data) {
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -188,9 +200,19 @@ template<
 	typename DeleterType,
 	DeleterType* Deleter
 >
-bool AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::isAllocated() const
+void AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::free()
 {
-	return m_data != nullptr;
+	if (!isAllocated())
+	{
+		return;
+	}
+
+	if (nullptr != m_deleter)
+	{
+		m_deleter(m_data);
+	}
+
+	m_data = nullptr;
 }
 
 template<
@@ -213,27 +235,6 @@ template<
 DataType*& AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::get()
 {
 	return m_data;
-}
-
-template<
-	typename DataType,
-	UINT32 Tag,
-	typename DeleterType,
-	DeleterType* Deleter
->
-void AutoDeletedPointer<DataType, Tag, DeleterType, Deleter>::free()
-{
-	if (!isAllocated())
-	{
-		return;
-	}
-
-	if (nullptr != m_deleter)
-	{
-		m_deleter(m_data);
-	}
-
-	m_data = nullptr;
 }
 
 template<

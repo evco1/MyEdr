@@ -1,9 +1,17 @@
 #pragma once
 
+#pragma warning(disable: 4180)
+
 template <class _Ty>
 struct remove_reference {
     using type = _Ty;
     using _Const_thru_ref_type = const _Ty;
+};
+
+template <class _Ty>
+struct remove_reference<_Ty*> {
+    using type = _Ty;
+    using _Const_thru_ref_type = const _Ty*;
 };
 
 template <class _Ty>

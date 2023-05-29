@@ -27,9 +27,9 @@ private:
 
 	RTL_AVL_TABLE m_table;
 
-	static RTL_GENERIC_COMPARE_RESULTS __stdcall CompareAvlTableEntries(const PRTL_AVL_TABLE table, const AvlTableEntry* first, const AvlTableEntry* second);
-	static PVOID __stdcall Allocate(const PRTL_AVL_TABLE table, CLONG byteCount);
-	static void __stdcall Free(const PRTL_AVL_TABLE table, PVOID buffer);
+	static RTL_GENERIC_COMPARE_RESULTS __stdcall compareAvlTableEntries(const PRTL_AVL_TABLE table, const AvlTableEntry* first, const AvlTableEntry* second);
+	static PVOID __stdcall allocate(const PRTL_AVL_TABLE table, CLONG byteCount);
+	static void __stdcall free(const PRTL_AVL_TABLE table, PVOID buffer);
 };
 
 template<typename DataType>
@@ -38,15 +38,15 @@ AvlTable<DataType>::AvlTable() :
 {
 	RtlInitializeGenericTableAvl(
 		&m_table,
-		reinterpret_cast<PRTL_AVL_COMPARE_ROUTINE>(CompareAvlTableEntries),
-		reinterpret_cast<PRTL_AVL_ALLOCATE_ROUTINE>(Allocate),
-		reinterpret_cast<PRTL_AVL_FREE_ROUTINE>(Free),
+		reinterpret_cast<PRTL_AVL_COMPARE_ROUTINE>(compareAvlTableEntries),
+		reinterpret_cast<PRTL_AVL_ALLOCATE_ROUTINE>(allocate),
+		reinterpret_cast<PRTL_AVL_FREE_ROUTINE>(free),
 		nullptr
 	);
 }
 
 template<typename DataType>
-RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::CompareAvlTableEntries(const PRTL_AVL_TABLE table, const AvlTableEntry* first, const AvlTableEntry* second)
+RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRTL_AVL_TABLE table, const AvlTableEntry* first, const AvlTableEntry* second)
 {
 	UNREFERENCED_PARAMETER(table);
 
@@ -64,17 +64,17 @@ RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::CompareAvlTableEntries(const PRT
 }
 
 template<typename DataType>
-PVOID AvlTable<DataType>::Allocate(const PRTL_AVL_TABLE table, const CLONG byteCount)
+PVOID AvlTable<DataType>::allocate(const PRTL_AVL_TABLE table, const CLONG byteCount)
 {
 	UNREFERENCED_PARAMETER(table);
 
-	return DefaultAllocate(byteCount);
+	return ::allocate(byteCount);
 }
 
 template<typename DataType>
-void AvlTable<DataType>::Free(const PRTL_AVL_TABLE table, PVOID buffer)
+void AvlTable<DataType>::free(const PRTL_AVL_TABLE table, PVOID buffer)
 {
 	UNREFERENCED_PARAMETER(table);
 
-	DefaultDelete(buffer);
+	::free(buffer);
 }

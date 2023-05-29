@@ -1,7 +1,6 @@
 #include <fltKernel.h>
 #include <ntddk.h>
 
-#include "CreateProcessNotifyRoutine.h"
 #include "Queue.h"
 #include "Result.h"
 #include "AutoDeletedPointer.h"
@@ -22,9 +21,9 @@ struct MyEdrData final
     PDRIVER_OBJECT DriverObject;
     Queue<AutoDeletedPointer<MyEdrEvent>> EventQueue;
     AvlTable<ULONG> BlacklistProcessIds;
-    CreateProcessNotifyRoutine CreateProcessNotifyRoutine;
-    AutoDeletedPointer<_FLT_FILTER> Filter;
     Mutex Mutex;
+    AutoDeletedPointer<remove_reference_t<PCREATE_PROCESS_NOTIFY_ROUTINE_EX>> ProcessNotifyRoutine;
+    AutoDeletedPointer<remove_reference_t<PFLT_FILTER>> Filter;
 };
 
 MyEdrData* g_myEdrData{ nullptr };
@@ -62,8 +61,8 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
     );
 
     AutoDeletedPointer<MyEdrEvent> event;
-    
-    event.allocate();
+    RETURN_ON_BAD_STATUS(event.allocate(), FLT_POSTOP_FINISHED_PROCESSING);
+
     event->Id = eventId;
     event->ProcessId = FltGetRequestorProcessId(data);
     KeQuerySystemTime(&event->TimeStamp);
@@ -136,15 +135,18 @@ extern "C" NTSTATUS DriverEntry(
         DriverObject,
         { MAX_EVENT_QUEUE_ENTRY_COUNT },
         {},
-        { MyEdrProcessNotifyRoutine },
-        { nullptr, FltUnregisterFilter },
-        {}
+        {},
+        { nullptr, [](PCREATE_PROCESS_NOTIFY_ROUTINE_EX processNotifyRoutine) { PsSetCreateProcessNotifyRoutineEx(processNotifyRoutine, TRUE); } },
+        { nullptr, FltUnregisterFilter }
     } };
 
     if (nullptr == myEdrData.get())
     {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
+
+    RETURN_STATUS_ON_BAD_STATUS(PsSetCreateProcessNotifyRoutineEx(MyEdrProcessNotifyRoutine, FALSE));
+    g_myEdrData->ProcessNotifyRoutine = MyEdrProcessNotifyRoutine;
 
     const FLT_OPERATION_REGISTRATION FilterOperationRegistration[] = \
     {

@@ -29,19 +29,14 @@ ENFORCE_SEMICOLON
 }													\
 ENFORCE_SEMICOLON
 
-#pragma pack(push)
-#pragma pack(1)
-struct EmptyStruct {};
-#pragma pack(pop)
-
 template<
-	typename DataType = EmptyStruct,
+	typename DataType,
 	typename AllocatedDataType = AutoDeletedPointer<DataType>
 >
 class Result final
 {
 public:
-	constexpr Result(NTSTATUS status = STATUS_SUCCESS);
+	Result(NTSTATUS status = STATUS_SUCCESS);
 	Result(const Result&) = delete;
 	Result(Result&&) = default;
 	Result(const DataType& data, NTSTATUS status = STATUS_SUCCESS);
@@ -56,8 +51,9 @@ public:
 	const DataType* operator->() const;
 	DataType* operator->();
 
-	bool isError() const;
 	NTSTATUS getStatus() const;
+
+	bool isError() const;
 
 private:
 	AllocatedDataType m_data;
@@ -65,7 +61,7 @@ private:
 };
 
 template<typename DataType, typename AllocatedDataType>
-constexpr Result<DataType, AllocatedDataType>::Result(const NTSTATUS status) :
+Result<DataType, AllocatedDataType>::Result(const NTSTATUS status) :
 	m_status{ status }
 {
 }
@@ -144,13 +140,13 @@ DataType* Result<DataType, AllocatedDataType>::operator->()
 }
 
 template<typename DataType, typename AllocatedDataType>
-bool Result<DataType, AllocatedDataType>::isError() const
+NTSTATUS Result<DataType, AllocatedDataType>::getStatus() const
 {
-	return !NT_SUCCESS(m_status);
+	return m_status;
 }
 
 template<typename DataType, typename AllocatedDataType>
-inline NTSTATUS Result<DataType, AllocatedDataType>::getStatus() const
+bool Result<DataType, AllocatedDataType>::isError() const
 {
-	return m_status;
+	return !NT_SUCCESS(m_status);
 }
