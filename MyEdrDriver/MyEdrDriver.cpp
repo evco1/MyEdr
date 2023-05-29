@@ -175,8 +175,7 @@ void CompleteRequest(PIRP irp)
     IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
-NTSTATUS
-MyEdrCreateClose(
+NTSTATUS MyEdrCreateClose(
     PDEVICE_OBJECT deviceObject,
     PIRP irp
 )
