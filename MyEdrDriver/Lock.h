@@ -2,13 +2,13 @@
 
 #include "Concepts.h"
 
-template <typename Type>
+template <class Type>
 concept Lockable = requires(Type type) {
 	{ type.acquire() } -> convertible_to<void>;
 	{ type.release() } -> convertible_to<void>;
 };
 
-template <typename LockableType> requires Lockable<LockableType>
+template <class LockableType> requires Lockable<LockableType>
 class Lock final
 {
 public:
@@ -26,14 +26,14 @@ private:
 	LockableType& m_lockable;
 };
 
-template<typename LockableType> requires Lockable<LockableType>
+template <class LockableType> requires Lockable<LockableType>
 Lock<LockableType>::Lock(LockableType& lockable) :
 	m_lockable(lockable)
 {
 	m_lockable.acquire();
 }
 
-template<typename LockableType> requires Lockable<LockableType>
+template <class LockableType> requires Lockable<LockableType>
 Lock<LockableType>::~Lock()
 {
 	m_lockable.release();

@@ -13,8 +13,9 @@
 
 #include <wdm.h>
 
-const UINT32 CONTEXT_POOL_TAG = 'chem';
+const UINT32 MY_EDR_FILTER_CONTEXT_POOL_TAG = 'cfem';
 const size_t MAX_EVENT_QUEUE_ENTRY_COUNT = 10000;
+const MyEdrVersion VERSION = { 1, 0, 0 };
 
 NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX processNotifyRoutine)
 {
@@ -132,7 +133,7 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
         RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.containsElement(processId), FLT_POSTOP_FINISHED_PROCESSING);
     }
 
-    auto myEdrEvent = MyEdrCreateEvent(eventId, processId, &nameInfo->Name);
+    AutoDeletedPointer<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(eventId, processId, &nameInfo->Name);
     RETURN_ON_CONDITION(nullptr == myEdrEvent, FLT_POSTOP_FINISHED_PROCESSING);
 
     MyEdrPushEventToQueue(move(myEdrEvent));
@@ -169,6 +170,11 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostWrite(
     return HandleFilterCallback(FileWrite, Data);
 }
 
+void CompleteRequest(PIRP irp)
+{
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+}
+
 NTSTATUS
 MyEdrCreateClose(
     PDEVICE_OBJECT deviceObject,
@@ -192,19 +198,39 @@ NTSTATUS MyEdrDeviceControl(
 {
     UNREFERENCED_PARAMETER(deviceObject);
 
-    const Lock lock(g_myEdrData->Mutex);
+    AutoDeletedPointer<IRP, decltype(CompleteRequest), CompleteRequest> request;
+
     const PIO_STACK_LOCATION irpStackLocation = IoGetCurrentIrpStackLocation(irp);
+
+    PVOID buffer = irp->AssociatedIrp.SystemBuffer;
+    RETURN_ON_CONDITION(nullptr == buffer, STATUS_INVALID_PARAMETER);
 
     switch (irpStackLocation->Parameters.DeviceIoControl.IoControlCode)
     {
     case SYSCTL_GET_VERSION:
+    {
+        RETURN_ON_CONDITION(sizeof(MyEdrVersion) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
+        RtlCopyMemory(buffer, &VERSION, sizeof(VERSION));
         break;
+    }
     case SYSCTL_GET_EVENTS:
+    {
+        RETURN_ON_CONDITION(sizeof(MyEdrEvent) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
+        Result<AutoDeletedPointer<MyEdrEvent>> myEdrEvent = g_myEdrData->EventQueue.popHead();
+        RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
+        RtlCopyMemory(buffer, &*myEdrEvent, sizeof(MyEdrEvent));
         break;
+    }
     case SYSCTL_ADD_BLACK:
+    {
+        RETURN_ON_CONDITION(sizeof(MyEdrBlacklistProcess) > irpStackLocation->Parameters.DeviceIoControl.InputBufferLength, STATUS_INVALID_PARAMETER);
+        g_myEdrData->BlacklistProcessIds.insertElement(static_cast<MyEdrBlacklistProcess*>(buffer)->ProcessId);
         break;
+    }
     default:
+    {
         return STATUS_INVALID_DEVICE_REQUEST;
+    }
     }
 
     return STATUS_SUCCESS;
@@ -249,7 +275,7 @@ extern "C" NTSTATUS DriverEntry(
     };
 
     const FLT_CONTEXT_REGISTRATION FilterContextRegistration[] = {
-        { FLT_STREAMHANDLE_CONTEXT, 0, nullptr, 0, CONTEXT_POOL_TAG },
+        { FLT_STREAMHANDLE_CONTEXT, 0, nullptr, 0, MY_EDR_FILTER_CONTEXT_POOL_TAG },
         { FLT_CONTEXT_END }
     };
 

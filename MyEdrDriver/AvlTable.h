@@ -5,7 +5,7 @@
 #include "Memory.h"
 #include "AutoDeletedPointer.h"
 
-template<typename DataType>
+template <class DataType>
 class AvlTable final
 {
 public:
@@ -37,7 +37,7 @@ private:
 	static void __stdcall free(const PRTL_AVL_TABLE table, PVOID buffer);
 };
 
-template<typename DataType>
+template <class DataType>
 AvlTable<DataType>::AvlTable() :
 	m_table{ nullptr }
 {
@@ -50,20 +50,20 @@ AvlTable<DataType>::AvlTable() :
 	);
 }
 
-template<typename DataType>
+template <class DataType>
 AvlTable<DataType>::~AvlTable()
 {
 	clear();
 }
 
-template<typename DataType>
+template <class DataType>
 bool AvlTable<DataType>::insertElement(const DataType& data)
 {
 	DataType copiedData = data;
 	return insertElement(move(copiedData));
 }
 
-template<typename DataType>
+template <class DataType>
 bool AvlTable<DataType>::insertElement(DataType&& data)
 {
 	AutoDeletedPointer<DataType> movedData = new DataType{ move(data) };
@@ -73,7 +73,7 @@ bool AvlTable<DataType>::insertElement(DataType&& data)
 	return true;
 }
 
-template<typename DataType>
+template <class DataType>
 bool AvlTable<DataType>::deleteElement(const DataType& data)
 {
 	AutoDeletedPointer<DataType> foundData = findElement(data);
@@ -82,7 +82,7 @@ bool AvlTable<DataType>::deleteElement(const DataType& data)
 	return RtlDeleteElementGenericTableAvl(&m_table, &foundData);
 }
 
-template<typename DataType>
+template <class DataType>
 DataType* AvlTable<DataType>::findElement(const DataType& data) const
 {
 	const DataType* pData = &data;
@@ -94,13 +94,13 @@ DataType* AvlTable<DataType>::findElement(const DataType& data) const
 	return *foundData;
 }
 
-template<typename DataType>
+template <class DataType>
 bool AvlTable<DataType>::containsElement(const DataType& data) const
 {
 	return nullptr != findElement(data);
 }
 
-template<typename DataType>
+template <class DataType>
 void AvlTable<DataType>::clear()
 {
 	DataType** data = static_cast<DataType**>(RtlEnumerateGenericTableAvl(&m_table, TRUE));
@@ -111,7 +111,7 @@ void AvlTable<DataType>::clear()
 	}
 }
 
-template<typename DataType>
+template <class DataType>
 RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRTL_AVL_TABLE table, const DataType** first, const DataType** second)
 {
 	UNREFERENCED_PARAMETER(table);
@@ -136,7 +136,7 @@ RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRT
 	return compareResult;
 }
 
-template<typename DataType>
+template <class DataType>
 PVOID AvlTable<DataType>::allocate(const PRTL_AVL_TABLE table, const CLONG byteCount)
 {
 	UNREFERENCED_PARAMETER(table);
@@ -145,7 +145,7 @@ PVOID AvlTable<DataType>::allocate(const PRTL_AVL_TABLE table, const CLONG byteC
 	return buffer;
 }
 
-template<typename DataType>
+template <class DataType>
 void AvlTable<DataType>::free(const PRTL_AVL_TABLE table, PVOID buffer)
 {
 	UNREFERENCED_PARAMETER(table);

@@ -6,9 +6,9 @@
 
 #pragma warning(disable: 4180)
 
-template<
-	typename DataType,
-	typename DeleterType = void(DataType* pointer),
+template <
+	class DataType,
+	class DeleterType = void(DataType* pointer),
 	DeleterType* Deleter = defaultDelete
 >
 class AutoDeletedPointer final
@@ -43,9 +43,9 @@ private:
 	DataType* m_data;
 };
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 AutoDeletedPointer<DataType, DeleterType, Deleter>::AutoDeletedPointer(AutoDeletedPointer&& other) :
@@ -54,9 +54,9 @@ AutoDeletedPointer<DataType, DeleterType, Deleter>::AutoDeletedPointer(AutoDelet
 	other.m_data = nullptr;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 AutoDeletedPointer<DataType, DeleterType, Deleter>::AutoDeletedPointer(DataType* data) :
@@ -64,9 +64,9 @@ AutoDeletedPointer<DataType, DeleterType, Deleter>::AutoDeletedPointer(DataType*
 {
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 AutoDeletedPointer<DataType, DeleterType, Deleter>::~AutoDeletedPointer()
@@ -74,9 +74,9 @@ AutoDeletedPointer<DataType, DeleterType, Deleter>::~AutoDeletedPointer()
 	free();
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 AutoDeletedPointer<DataType, DeleterType, Deleter>& AutoDeletedPointer<DataType, DeleterType, Deleter>::operator=(AutoDeletedPointer&& other)
@@ -91,9 +91,9 @@ AutoDeletedPointer<DataType, DeleterType, Deleter>& AutoDeletedPointer<DataType,
 	return *this;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 AutoDeletedPointer<DataType, DeleterType, Deleter>& AutoDeletedPointer<DataType, DeleterType, Deleter>::operator=(DataType* data)
@@ -107,15 +107,15 @@ AutoDeletedPointer<DataType, DeleterType, Deleter>& AutoDeletedPointer<DataType,
 	return *this;
 }
 
-template<typename DataType, typename DeleterType, DeleterType* Deleter>
+template <class DataType, class DeleterType, DeleterType* Deleter>
 bool AutoDeletedPointer<DataType, DeleterType, Deleter>::operator==(const DataType* data) const
 {
 	return data == m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 const DataType& AutoDeletedPointer<DataType, DeleterType, Deleter>::operator*() const
@@ -123,9 +123,9 @@ const DataType& AutoDeletedPointer<DataType, DeleterType, Deleter>::operator*() 
 	return *m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 DataType& AutoDeletedPointer<DataType, DeleterType, Deleter>::operator*()
@@ -133,9 +133,9 @@ DataType& AutoDeletedPointer<DataType, DeleterType, Deleter>::operator*()
 	return *m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 const DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::operator->() const
@@ -143,9 +143,9 @@ const DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::operator->()
 	return m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::operator->()
@@ -153,9 +153,9 @@ DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::operator->()
 	return m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 void AutoDeletedPointer<DataType, DeleterType, Deleter>::free()
@@ -169,9 +169,9 @@ void AutoDeletedPointer<DataType, DeleterType, Deleter>::free()
 	m_data = nullptr;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 const DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::get() const
@@ -179,9 +179,9 @@ const DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::get() const
 	return m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 DataType*& AutoDeletedPointer<DataType, DeleterType, Deleter>::get()
@@ -189,9 +189,9 @@ DataType*& AutoDeletedPointer<DataType, DeleterType, Deleter>::get()
 	return m_data;
 }
 
-template<
-	typename DataType,
-	typename DeleterType,
+template <
+	class DataType,
+	class DeleterType,
 	DeleterType* Deleter
 >
 DataType* AutoDeletedPointer<DataType, DeleterType, Deleter>::release()

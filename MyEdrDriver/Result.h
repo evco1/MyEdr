@@ -16,22 +16,16 @@ ENFORCE_SEMICOLON
 #define RETURN_ON_BAD_STATUS(expression, returnValue) RETURN_ON_CONDITION(!NT_SUCCESS(expression), returnValue)
 
 #define RETURN_STATUS_ON_BAD_STATUS(expression) {	\
-	const NTSTATUS _status = expression;					\
+	const NTSTATUS _status = expression;			\
 	RETURN_ON_BAD_STATUS(_status, _status);			\
 }													\
 ENFORCE_SEMICOLON
 
 #define RETURN_ON_BAD_RESULT(expression, returnValue) RETURN_ON_BAD_STATUS(expression.getStatus(), returnValue)
 
-#define RETURN_RESULT_ON_BAD_RESULT(expression) {	\
-	auto _result = expression;						\
-	RETURN_ON_BAD_RESULT(_result, _result);			\
-}													\
-ENFORCE_SEMICOLON
-
-template<
-	typename DataType,
-	typename AllocatedDataType = AutoDeletedPointer<DataType>
+template <
+	class DataType,
+	class AllocatedDataType = AutoDeletedPointer<DataType>
 >
 class Result final
 {
@@ -58,13 +52,13 @@ private:
 	NTSTATUS m_status;
 };
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 Result<DataType, AllocatedDataType>::Result(const NTSTATUS status) :
 	m_status{ status }
 {
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 Result<DataType, AllocatedDataType>::Result(const DataType& data, NTSTATUS status)
 {
 	m_data = new DataType{ data };
@@ -78,7 +72,7 @@ Result<DataType, AllocatedDataType>::Result(const DataType& data, NTSTATUS statu
 	m_status = status;
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 Result<DataType, AllocatedDataType>::Result(DataType&& data, const NTSTATUS status)
 {
 	m_data = new DataType{ move(data) };
@@ -92,7 +86,7 @@ Result<DataType, AllocatedDataType>::Result(DataType&& data, const NTSTATUS stat
 	m_status = status;
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 Result<DataType, AllocatedDataType>& Result<DataType, AllocatedDataType>::operator=(Result&& other)
 {
 	m_data.allocate();
@@ -101,31 +95,31 @@ Result<DataType, AllocatedDataType>& Result<DataType, AllocatedDataType>::operat
 	return *this;
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 const DataType& Result<DataType, AllocatedDataType>::operator*() const
 {
 	return *m_data;
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 DataType& Result<DataType, AllocatedDataType>::operator*()
 {
 	return *m_data;
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 const DataType* Result<DataType, AllocatedDataType>::operator->() const
 {
 	return m_data.get();
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 DataType* Result<DataType, AllocatedDataType>::operator->()
 {
 	return m_data.get();
 }
 
-template<typename DataType, typename AllocatedDataType>
+template <class DataType, class AllocatedDataType>
 NTSTATUS Result<DataType, AllocatedDataType>::getStatus() const
 {
 	return m_status;

@@ -9,7 +9,7 @@
 
 const size_t DEFAULT_QUEUE_MAX_ENTRY_COUNT = 1000;
 
-template<typename DataType>
+template <class DataType>
 class Queue final
 {
 public:
@@ -50,7 +50,7 @@ private:
 	size_t m_currentEntryCount;
 };
 
-template<typename DataType>
+template <class DataType>
 Queue<DataType>::Queue(const size_t maxEntryCount) :
 	m_maxEntryCount{ maxEntryCount },
 	m_currentEntryCount{ 0 }
@@ -58,19 +58,19 @@ Queue<DataType>::Queue(const size_t maxEntryCount) :
 	InitializeListHead(&m_head);
 }
 
-template<typename DataType>
+template <class DataType>
 Queue<DataType>::Queue(Queue&& other)
 {
 	*this = move(other);
 }
 
-template<typename DataType>
+template <class DataType>
 Queue<DataType>::~Queue()
 {
 	clear();
 }
 
-template<typename DataType>
+template <class DataType>
 Queue<DataType>& Queue<DataType>::operator=(Queue&& other)
 {
 	if (this != &other)
@@ -86,26 +86,26 @@ Queue<DataType>& Queue<DataType>::operator=(Queue&& other)
 	return *this;
 }
 
-template<typename DataType>
+template <class DataType>
 bool Queue<DataType>::isEmpty() const
 {
 	return m_currentEntryCount == 0;
 }
 
-template<typename DataType>
+template <class DataType>
 bool Queue<DataType>::isFull() const
 {
 	return m_currentEntryCount == m_maxEntryCount;
 }
 
-template<typename DataType>
+template <class DataType>
 NTSTATUS Queue<DataType>::pushTail(const DataType& data)
 {
 	DataType copiedData = data;
 	return pushTail(move(copiedData));
 }
 
-template<typename DataType>
+template <class DataType>
 NTSTATUS Queue<DataType>::pushTail(DataType&& data)
 {
 	RETURN_ON_CONDITION(isFull(), STATUS_MY_EDR_QUEUE_IS_FULL);
@@ -122,7 +122,7 @@ NTSTATUS Queue<DataType>::pushTail(DataType&& data)
 	return STATUS_SUCCESS;
 }
 
-template<typename DataType>
+template <class DataType>
 Result<DataType> Queue<DataType>::popHead()
 {
 	RETURN_ON_CONDITION(isEmpty(), STATUS_MY_EDR_QUEUE_IS_EMPTY);
@@ -133,7 +133,7 @@ Result<DataType> Queue<DataType>::popHead()
 	return move(queueEntry->Data);
 }
 
-template<typename DataType>
+template <class DataType>
 NTSTATUS Queue<DataType>::clear()
 {
 	NTSTATUS status;
