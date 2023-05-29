@@ -4,7 +4,9 @@
 
 #include "Memory.h"
 
-template<typename DataType>
+const UINT32 MY_EDR_AVL_TABLE_ENTRIES_TAG = 'eaem';
+
+template<typename DataType, UINT32 Tag = MY_EDR_AVL_TABLE_ENTRIES_TAG>
 class AvlTable final
 {
 public:
@@ -32,8 +34,8 @@ private:
 	static void __stdcall free(const PRTL_AVL_TABLE table, PVOID buffer);
 };
 
-template<typename DataType>
-AvlTable<DataType>::AvlTable() :
+template<typename DataType, UINT32 Tag>
+AvlTable<DataType, Tag>::AvlTable() :
 	m_table{ nullptr }
 {
 	RtlInitializeGenericTableAvl(
@@ -45,8 +47,8 @@ AvlTable<DataType>::AvlTable() :
 	);
 }
 
-template<typename DataType>
-RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRTL_AVL_TABLE table, const AvlTableEntry* first, const AvlTableEntry* second)
+template<typename DataType, UINT32 Tag>
+RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType, Tag>::compareAvlTableEntries(const PRTL_AVL_TABLE table, const AvlTableEntry* first, const AvlTableEntry* second)
 {
 	UNREFERENCED_PARAMETER(table);
 
@@ -63,16 +65,16 @@ RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRT
 	return GenericEqual;
 }
 
-template<typename DataType>
-PVOID AvlTable<DataType>::allocate(const PRTL_AVL_TABLE table, const CLONG byteCount)
+template<typename DataType, UINT32 Tag>
+PVOID AvlTable<DataType, Tag>::allocate(const PRTL_AVL_TABLE table, const CLONG byteCount)
 {
 	UNREFERENCED_PARAMETER(table);
 
 	return ::allocate(byteCount);
 }
 
-template<typename DataType>
-void AvlTable<DataType>::free(const PRTL_AVL_TABLE table, PVOID buffer)
+template<typename DataType, UINT32 Tag>
+void AvlTable<DataType, Tag>::free(const PRTL_AVL_TABLE table, PVOID buffer)
 {
 	UNREFERENCED_PARAMETER(table);
 

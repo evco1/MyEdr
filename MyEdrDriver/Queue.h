@@ -10,7 +10,7 @@
 const UINT32 MY_EDR_QUEUE_ENTRIES_TAG = 'eqem';
 const size_t DEFAULT_QUEUE_MAX_ENTRY_COUNT = 1000;
 
-template<typename DataType>
+template<typename DataType, UINT32 Tag = MY_EDR_QUEUE_ENTRIES_TAG>
 class Queue final
 {
 public:
@@ -44,35 +44,35 @@ private:
 	};
 #pragma pack(pop)
 
-	using QueueEntryPointer = AutoDeletedPointer<QueueEntry, MY_EDR_QUEUE_ENTRIES_TAG>;
+	using QueueEntryPointer = AutoDeletedPointer<QueueEntry, Tag>;
 
 	LIST_ENTRY m_head;
 	size_t m_maxEntryCount;
 	size_t m_currentEntryCount;
 };
 
-template<typename DataType>
-Queue<DataType>::Queue(const size_t maxEntryCount) :
+template<typename DataType, UINT32 Tag>
+Queue<DataType, Tag>::Queue(const size_t maxEntryCount) :
 	m_maxEntryCount{ maxEntryCount },
 	m_currentEntryCount{ 0 }
 {
 	InitializeListHead(&m_head);
 }
 
-template<typename DataType>
-Queue<DataType>::Queue(Queue&& other)
+template<typename DataType, UINT32 Tag>
+Queue<DataType, Tag>::Queue(Queue&& other)
 {
 	*this = move(other);
 }
 
-template<typename DataType>
-Queue<DataType>::~Queue()
+template<typename DataType, UINT32 Tag>
+Queue<DataType, Tag>::~Queue()
 {
 	clear();
 }
 
-template<typename DataType>
-Queue<DataType>& Queue<DataType>::operator=(Queue&& other)
+template<typename DataType, UINT32 Tag>
+Queue<DataType, Tag>& Queue<DataType, Tag>::operator=(Queue&& other)
 {
 	if (this != &other)
 	{
@@ -87,27 +87,27 @@ Queue<DataType>& Queue<DataType>::operator=(Queue&& other)
 	return *this;
 }
 
-template<typename DataType>
-bool Queue<DataType>::isEmpty() const
+template<typename DataType, UINT32 Tag>
+bool Queue<DataType, Tag>::isEmpty() const
 {
 	return m_currentEntryCount == 0;
 }
 
-template<typename DataType>
-bool Queue<DataType>::isFull() const
+template<typename DataType, UINT32 Tag>
+bool Queue<DataType, Tag>::isFull() const
 {
 	return m_currentEntryCount == m_maxEntryCount;
 }
 
-template<typename DataType>
-Result<DataType> Queue<DataType>::pushTail(const DataType& data)
+template<typename DataType, UINT32 Tag>
+Result<DataType> Queue<DataType, Tag>::pushTail(const DataType& data)
 {
 	DataType copiedData = data;
 	return pushTail(move(copiedData));
 }
 
-template<typename DataType>
-Result<DataType> Queue<DataType>::pushTail(DataType&& data)
+template<typename DataType, UINT32 Tag>
+Result<DataType> Queue<DataType, Tag>::pushTail(DataType&& data)
 {
 	RETURN_ON_CONDITION(isFull(), STATUS_MY_EDR_QUEUE_IS_FULL);
 
@@ -123,8 +123,8 @@ Result<DataType> Queue<DataType>::pushTail(DataType&& data)
 	return { STATUS_SUCCESS };
 }
 
-template<typename DataType>
-Result<DataType> Queue<DataType>::popHead()
+template<typename DataType, UINT32 Tag>
+Result<DataType> Queue<DataType, Tag>::popHead()
 {
 	RETURN_ON_CONDITION(isEmpty(), STATUS_MY_EDR_QUEUE_IS_EMPTY);
 
@@ -134,8 +134,8 @@ Result<DataType> Queue<DataType>::popHead()
 	return move(queueEntry->Data);
 }
 
-template<typename DataType>
-NTSTATUS Queue<DataType>::clear()
+template<typename DataType, UINT32 Tag>
+NTSTATUS Queue<DataType, Tag>::clear()
 {
 	NTSTATUS status;
 

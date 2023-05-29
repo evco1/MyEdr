@@ -2,7 +2,7 @@
 
 #include <wdm.h>
 
-#define MY_EDR_DATA_DEFAULT_TAG 'ddem'
+const UINT32 MY_EDR_DATA_DEFAULT_TAG = 'ddem';
 
 template<typename DataType = void, UINT32 Tag = MY_EDR_DATA_DEFAULT_TAG>
 DataType* allocate(size_t size)
