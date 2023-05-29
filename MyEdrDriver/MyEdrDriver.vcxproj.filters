@@ -66,9 +66,6 @@
     <ClInclude Include="RemovePointer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="TypeTraits.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Result.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -241,7 +241,6 @@
     <ClInclude Include="Statuses.h" />
     <ClInclude Include="Move.h" />
     <ClInclude Include="Queue.h" />
-    <ClInclude Include="TypeTraits.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
