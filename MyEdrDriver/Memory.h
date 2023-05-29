@@ -2,16 +2,22 @@
 
 #include <wdm.h>
 
-const UINT32 MY_EDR_DATA_DEFAULT_TAG = 'ddem';
+const UINT32 MY_EDR_DATA_TAG = 'ddem';
 
-template<typename DataType = void, UINT32 Tag = MY_EDR_DATA_DEFAULT_TAG>
+template<typename DataType = void>
 DataType* allocate(size_t size)
 {
-    return static_cast<DataType*>(ExAllocatePoolZero(NonPagedPool, size, Tag));
+    return static_cast<DataType*>(ExAllocatePoolZero(NonPagedPool, size, MY_EDR_DATA_TAG));
 }
 
-template<typename DataType = void, UINT32 Tag = MY_EDR_DATA_DEFAULT_TAG>
+template<typename DataType = void>
 void free(DataType* pointer)
 {
-    ExFreePoolWithTag(pointer, Tag);
+    ExFreePoolWithTag(pointer, MY_EDR_DATA_TAG);
+}
+
+template<typename DataType>
+void defaultDelete(DataType* data)
+{
+    delete data;
 }

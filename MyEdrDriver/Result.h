@@ -53,8 +53,6 @@ public:
 
 	NTSTATUS getStatus() const;
 
-	bool isError() const;
-
 private:
 	AllocatedDataType m_data;
 	NTSTATUS m_status;
@@ -69,40 +67,28 @@ Result<DataType, AllocatedDataType>::Result(const NTSTATUS status) :
 template<typename DataType, typename AllocatedDataType>
 Result<DataType, AllocatedDataType>::Result(const DataType& data, NTSTATUS status)
 {
-	m_status = m_data.allocate();
+	m_data = new DataType{ data };
 
-	if (!NT_SUCCESS(m_status))
-	{
-		return;
-	}
-
-	if (!m_data.isAllocated())
+	if (m_data.isAllocated())
 	{
 		m_status = STATUS_INSUFFICIENT_RESOURCES;
 		return;
 	}
 
-	*m_data = data;
 	m_status = status;
 }
 
 template<typename DataType, typename AllocatedDataType>
 Result<DataType, AllocatedDataType>::Result(DataType&& data, const NTSTATUS status)
 {
-	m_status = m_data.allocate();
+	m_data = new DataType{ move(data) };
 
-	if (!NT_SUCCESS(m_status))
-	{
-		return;
-	}
-
-	if (!m_data.isAllocated())
+	if (nullptr == m_data)
 	{
 		m_status = STATUS_INSUFFICIENT_RESOURCES;
 		return;
 	}
 
-	*m_data = move(data);
 	m_status = status;
 }
 
@@ -143,10 +129,4 @@ template<typename DataType, typename AllocatedDataType>
 NTSTATUS Result<DataType, AllocatedDataType>::getStatus() const
 {
 	return m_status;
-}
-
-template<typename DataType, typename AllocatedDataType>
-bool Result<DataType, AllocatedDataType>::isError() const
-{
-	return !NT_SUCCESS(m_status);
 }

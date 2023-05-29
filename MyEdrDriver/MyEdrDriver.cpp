@@ -16,14 +16,27 @@
 const UINT32 CONTEXT_POOL_TAG = 'chem';
 const size_t MAX_EVENT_QUEUE_ENTRY_COUNT = 10000;
 
+NTSTATUS ProcessNotifyRoutingDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX processNotifyRoutine)
+{
+    return PsSetCreateProcessNotifyRoutineEx(processNotifyRoutine, TRUE);
+}
+
 struct MyEdrData final
 {
     PDRIVER_OBJECT DriverObject;
     Queue<AutoDeletedPointer<MyEdrEvent>> EventQueue;
-    AvlTable<ULONG> BlacklistProcessIds;
+    AvlTable<HANDLE> BlacklistProcessIds;
     Mutex Mutex;
-    AutoDeletedPointer<remove_reference_t<PCREATE_PROCESS_NOTIFY_ROUTINE_EX>> ProcessNotifyRoutine;
-    AutoDeletedPointer<remove_reference_t<PFLT_FILTER>> Filter;
+    AutoDeletedPointer<
+        remove_reference_t<PCREATE_PROCESS_NOTIFY_ROUTINE_EX>,
+        decltype(ProcessNotifyRoutingDeleter),
+        ProcessNotifyRoutingDeleter
+    > ProcessNotifyRoutine;
+    AutoDeletedPointer<
+        remove_reference_t<PFLT_FILTER>,
+        decltype(FltUnregisterFilter),
+        FltUnregisterFilter
+    > Filter;
 };
 
 MyEdrData* g_myEdrData{ nullptr };
@@ -38,7 +51,10 @@ void MyEdrProcessNotifyRoutine(
     UNREFERENCED_PARAMETER(processId);
     UNREFERENCED_PARAMETER(createInfo);
 
-    DEBUG_PRINT("%p %p %wZ", process, processId, nullptr == createInfo ? UNICODE_STRING{ 0, 0 } : *createInfo->ImageFileName);
+    if (nullptr != createInfo)
+    {
+        g_myEdrData->BlacklistProcessIds.insertElement(processId);
+    }
 }
 
 FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
@@ -49,7 +65,11 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
     RETURN_ON_BAD_STATUS(data->IoStatus.Status, FLT_POSTOP_FINISHED_PROCESSING);
     RETURN_ON_CONDITION(STATUS_REPARSE == data->IoStatus.Status, FLT_POSTOP_FINISHED_PROCESSING);
 
-    AutoDeletedPointer<FLT_FILE_NAME_INFORMATION> nameInfo{ nullptr, FltReleaseFileNameInformation };
+    AutoDeletedPointer<
+        FLT_FILE_NAME_INFORMATION,
+        decltype(FltReleaseFileNameInformation),
+        FltReleaseFileNameInformation
+    > nameInfo;
 
     RETURN_ON_BAD_STATUS(
         FltGetFileNameInformation(
@@ -60,8 +80,8 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
         FLT_POSTOP_FINISHED_PROCESSING
     );
 
-    AutoDeletedPointer<MyEdrEvent> event;
-    RETURN_ON_BAD_STATUS(event.allocate(), FLT_POSTOP_FINISHED_PROCESSING);
+    AutoDeletedPointer<MyEdrEvent> event = new MyEdrEvent;
+    RETURN_ON_CONDITION(nullptr == event, FLT_POSTOP_FINISHED_PROCESSING);
 
     event->Id = eventId;
     event->ProcessId = FltGetRequestorProcessId(data);
@@ -131,22 +151,22 @@ extern "C" NTSTATUS DriverEntry(
     UNREFERENCED_PARAMETER(DriverObject);
     UNREFERENCED_PARAMETER(RegistryPath);
 
-    AutoDeletedPointer<MyEdrData> myEdrData{ new MyEdrData{
+    AutoDeletedPointer<MyEdrData> myEdrData = new MyEdrData{
         DriverObject,
-        { MAX_EVENT_QUEUE_ENTRY_COUNT },
-        {},
-        {},
-        { nullptr, [](PCREATE_PROCESS_NOTIFY_ROUTINE_EX processNotifyRoutine) { PsSetCreateProcessNotifyRoutineEx(processNotifyRoutine, TRUE); } },
-        { nullptr, FltUnregisterFilter }
-    } };
+        { MAX_EVENT_QUEUE_ENTRY_COUNT }
+    };
 
     if (nullptr == myEdrData.get())
     {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
+    // It's very important that g_myEdrData will be already initialized here because from this point,
+    // a callback can be called and g_myEdrData is being accessed from the callbacks.
+    g_myEdrData = myEdrData.get();
+
     RETURN_STATUS_ON_BAD_STATUS(PsSetCreateProcessNotifyRoutineEx(MyEdrProcessNotifyRoutine, FALSE));
-    g_myEdrData->ProcessNotifyRoutine = MyEdrProcessNotifyRoutine;
+    myEdrData->ProcessNotifyRoutine = MyEdrProcessNotifyRoutine;
 
     const FLT_OPERATION_REGISTRATION FilterOperationRegistration[] = \
     {
@@ -175,8 +195,8 @@ extern "C" NTSTATUS DriverEntry(
     ));
 
     RETURN_STATUS_ON_BAD_STATUS(FltStartFiltering(myEdrData->Filter.get()));
+    myEdrData.release();
 
-    g_myEdrData = myEdrData.release();
     DriverObject->DriverUnload = DriverUnload;
     return STATUS_SUCCESS;
 }
