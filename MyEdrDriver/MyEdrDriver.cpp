@@ -4,8 +4,6 @@
 #include "Queue.h"
 #include "Result.h"
 #include "AutoDeletedPointer.h"
-#include "Statuses.h"
-#include "Debug.h"
 #include "MyEdrEvent.h"
 #include "Mutex.h"
 #include "Lock.h"
@@ -143,31 +141,31 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
 }
 
 FLT_POSTOP_CALLBACK_STATUS MyEdrPostCreate(
-    PFLT_CALLBACK_DATA Data,
-    PCFLT_RELATED_OBJECTS FltObjects,
-    PVOID CompletionContext,
-    FLT_POST_OPERATION_FLAGS Flags
+    PFLT_CALLBACK_DATA data,
+    PCFLT_RELATED_OBJECTS fltObjects,
+    PVOID completionContext,
+    FLT_POST_OPERATION_FLAGS flags
 )
 {
-    UNREFERENCED_PARAMETER(FltObjects);
-    UNREFERENCED_PARAMETER(CompletionContext);
-    UNREFERENCED_PARAMETER(Flags);
+    UNREFERENCED_PARAMETER(fltObjects);
+    UNREFERENCED_PARAMETER(completionContext);
+    UNREFERENCED_PARAMETER(flags);
 
-    return HandleFilterCallback(FileCreate, Data);
+    return HandleFilterCallback(FileCreate, data);
 }
 
 FLT_POSTOP_CALLBACK_STATUS MyEdrPostWrite(
-    PFLT_CALLBACK_DATA Data,
-    PCFLT_RELATED_OBJECTS FltObjects,
-    PVOID CompletionContext,
-    FLT_POST_OPERATION_FLAGS Flags
+    PFLT_CALLBACK_DATA data,
+    PCFLT_RELATED_OBJECTS fltObjects,
+    PVOID completionContext,
+    FLT_POST_OPERATION_FLAGS flags
 )
 {
-    UNREFERENCED_PARAMETER(FltObjects);
-    UNREFERENCED_PARAMETER(CompletionContext);
-    UNREFERENCED_PARAMETER(Flags);
+    UNREFERENCED_PARAMETER(fltObjects);
+    UNREFERENCED_PARAMETER(completionContext);
+    UNREFERENCED_PARAMETER(flags);
 
-    return HandleFilterCallback(FileWrite, Data);
+    return HandleFilterCallback(FileWrite, data);
 }
 
 void CompleteRequest(PIRP irp)

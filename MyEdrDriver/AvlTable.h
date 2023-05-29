@@ -78,7 +78,6 @@ bool AvlTable<DataType>::deleteElement(const DataType& data)
 {
 	AutoDeletedPointer<DataType> foundData = findElement(data);
 	RETURN_ON_CONDITION(nullptr == foundData, false);
-	DEBUG_PRINT("%u, %u", data, *foundData);
 	return RtlDeleteElementGenericTableAvl(&m_table, &foundData);
 }
 
@@ -116,24 +115,17 @@ RTL_GENERIC_COMPARE_RESULTS AvlTable<DataType>::compareAvlTableEntries(const PRT
 {
 	UNREFERENCED_PARAMETER(table);
 
-	DEBUG_PRINT("%u, %u", **first, **second);
-
-	RTL_GENERIC_COMPARE_RESULTS compareResult;
-
 	if (**first < **second)
 	{
-		compareResult = GenericLessThan;
+		return GenericLessThan;
 	}
-	else if (**first > **second)
+	
+	if (**first > **second)
 	{
-		compareResult = GenericGreaterThan;
-	}
-	else
-	{
-		compareResult = GenericEqual;
+		return GenericGreaterThan;
 	}
 
-	return compareResult;
+	return GenericEqual;
 }
 
 template <class DataType>
@@ -149,8 +141,6 @@ template <class DataType>
 void AvlTable<DataType>::free(const PRTL_AVL_TABLE table, PVOID buffer)
 {
 	UNREFERENCED_PARAMETER(table);
-
-	DEBUG_PRINT("%u", **reinterpret_cast<ULONG**>(static_cast<PRTL_BALANCED_LINKS>(buffer) + 1));
 
 	::free(buffer);
 }
