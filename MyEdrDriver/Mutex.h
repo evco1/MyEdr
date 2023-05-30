@@ -1,6 +1,6 @@
 #pragma once
 
-#include <wdm.h>
+#include <ntddk.h>
 
 class Mutex final
 {

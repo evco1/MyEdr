@@ -1,6 +1,6 @@
 #pragma once
 
-#include <wdm.h>
+#include <ntddk.h>
 
 #define STATUS_DEFINER_CUSTOMER	0x1
 #define STATUS_FACILITY_MY_EDR	0x1FFF

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "AutoDeletedPointer.h"
+#include <ntddk.h>
 
-#include <wdm.h>
+#include "AutoDeletedPointer.h"
 
 class UnicodeString
 {

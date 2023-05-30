@@ -1,11 +1,11 @@
 #pragma once
 
+#include <ntddk.h>
+
 #include "AutoDeletedPointer.h"
 #include "Result.h"
 #include "Utility.h"
 #include "Statuses.h"
-
-#include <wdm.h>
 
 const size_t DEFAULT_QUEUE_MAX_ENTRY_COUNT = 1000;
 

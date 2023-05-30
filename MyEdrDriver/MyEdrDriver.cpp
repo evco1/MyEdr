@@ -10,8 +10,6 @@
 #include "AvlTable.h"
 #include "UnicodeString.h"
 
-#include <wdm.h>
-
 const UINT32 MY_EDR_FILTER_CONTEXT_POOL_TAG = 'cfem';
 const size_t MY_EDR_MAX_EVENT_QUEUE_ENTRY_COUNT = 10000;
 const MyEdrVersion MY_EDR_VERSION = { 1, 0, 0 };
@@ -43,6 +41,12 @@ struct MyEdrData final
         decltype(IoDeleteDevice),
         IoDeleteDevice
     > Device;
+    AutoDeletedPointer<UNICODE_STRING> DeviceSymbolicLinkName;
+    AutoDeletedPointer<
+        UNICODE_STRING,
+        decltype(IoDeleteSymbolicLink),
+        IoDeleteSymbolicLink
+    > DeviceSymbolicLink;
 };
 
 MyEdrData* g_myEdrData{ nullptr };
@@ -334,11 +338,17 @@ extern "C" NTSTATUS DriverEntry(
         driverObject,
         0,
         &deviceName,
-        FILE_DEVICE_UNKNOWN,
-        FILE_DEVICE_SECURE_OPEN,
+        FILE_DEVICE_CONTROLLER,
+        0,
         FALSE,
         &myEdrData->Device.get()
     ));
+
+    myEdrData->DeviceSymbolicLinkName = new UNICODE_STRING;
+    RETURN_ON_CONDITION(nullptr == myEdrData->DeviceSymbolicLinkName, STATUS_INSUFFICIENT_RESOURCES);
+    RtlInitUnicodeString(myEdrData->DeviceSymbolicLinkName.get(), MY_EDR_DOS_DEVICE_NAME);
+    RETURN_STATUS_ON_BAD_STATUS(IoCreateSymbolicLink(myEdrData->DeviceSymbolicLink.get(), &deviceName));
+    myEdrData->DeviceSymbolicLink = myEdrData->DeviceSymbolicLinkName.get();
 
     driverObject->DriverUnload = DriverUnload;
     driverObject->MajorFunction[IRP_MJ_CLOSE] = driverObject->MajorFunction[IRP_MJ_CREATE] = MyEdrCreateClose;

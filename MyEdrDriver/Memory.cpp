@@ -1,7 +1,7 @@
+#include <ntddk.h>
+
 #include "Memory.h"
 #include "Debug.h"
-
-#include <wdm.h>
 
 void* __cdecl operator new(size_t size)
 {

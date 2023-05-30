@@ -1,9 +1,9 @@
 #pragma once
 
+#include <ntddk.h>
+
 #include "AutoDeletedPointer.h"
 #include "Utility.h"
-
-#include <wdm.h>
 
 #define ENFORCE_SEMICOLON static_assert(true)
 

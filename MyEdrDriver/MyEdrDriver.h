@@ -1,6 +1,7 @@
 #include <minwindef.h>
 
 const WCHAR MY_EDR_DEVICE_NAME[] = L"\\Device\\MyEdr";
+const WCHAR MY_EDR_DOS_DEVICE_NAME[] = L"\\DosDevices\\MyEdrTest";
 
 const ULONG SYSCTL_GET_VERSION = static_cast<ULONG>(CTL_CODE(0xFFFF, 0xF00, METHOD_BUFFERED, FILE_ANY_ACCESS));
 const ULONG SYSCTL_GET_EVENTS = static_cast<ULONG>(CTL_CODE(0xFFFF, 0xF01, METHOD_BUFFERED, FILE_ANY_ACCESS));
@@ -28,13 +29,13 @@ struct MyEdrEvent final {
     MyEdrEventId Id;
     ULONG ProcessId;
     LARGE_INTEGER TimeStamp;
-    WCHAR Name[MAX_PATH];
+    wchar_t Name[MAX_PATH];
 };
 #pragma pack(pop)
 
 #pragma pack(push)
 #pragma pack(1)
 struct MyEdrBlacklistProcess final {
-    WCHAR Name[MAX_PATH];
+    wchar_t Name[MAX_PATH];
 };
 #pragma pack(pop)

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Memory.h"
+#include <ntddk.h>
 
-#include <wdm.h>
+#include "Memory.h"
 
 #pragma warning(disable: 4180)
 

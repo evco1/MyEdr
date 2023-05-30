@@ -1,7 +1,7 @@
+#include <ntddk.h>
+
 #include "Mutex.h"
 #include "Utility.h"
-
-#include <wdm.h>
 
 Mutex::Mutex()
 {

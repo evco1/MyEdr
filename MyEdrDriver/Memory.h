@@ -1,6 +1,6 @@
 #pragma once
 
-#include <wdm.h>
+#include <ntddk.h>
 
 const UINT32 MY_EDR_ALLOCATED_DATA_POOL_TAG = 'daem';
 
