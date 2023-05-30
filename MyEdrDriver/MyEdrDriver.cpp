@@ -104,14 +104,11 @@ void MyEdrCreateProcessNotifyRoutine(
         processName.copyFrom(*createInfo->ImageFileName);
 
         const Lock lock = { g_myEdrData->Mutex };
-        if (g_myEdrData->BlacklistProcessNames.containsElement(&processName))
-        {
+        if (g_myEdrData->BlacklistProcessNames.containsElement(&processName)) {
             AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ reinterpret_cast<const ULONG&>(processId) };
 
-            if (nullptr != g_myEdrData)
-            {
-                if (NT_SUCCESS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get())))
-                {
+            if (nullptr != g_myEdrData) {
+                if (NT_SUCCESS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()))) {
                     copiedProcessId.release();
                 }
             }
