@@ -236,10 +236,9 @@
     <ClInclude Include="Debug.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="MyEdrEvent.h" />
-    <ClInclude Include="RemovePointer.h" />
     <ClInclude Include="Result.h" />
     <ClInclude Include="Statuses.h" />
-    <ClInclude Include="Move.h" />
+    <ClInclude Include="Utility.h" />
     <ClInclude Include="Queue.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
