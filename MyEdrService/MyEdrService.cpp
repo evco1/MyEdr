@@ -1,8 +1,5 @@
 #include <Windows.h>
 
-#include <iostream>
-#include <string>
-
 void main()
 {
 	HANDLE a = CreateFileW(
