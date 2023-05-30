@@ -347,7 +347,7 @@ extern "C" NTSTATUS DriverEntry(
     myEdrData->DeviceSymbolicLinkName = new UNICODE_STRING;
     RETURN_ON_CONDITION(nullptr == myEdrData->DeviceSymbolicLinkName, STATUS_INSUFFICIENT_RESOURCES);
     RtlInitUnicodeString(myEdrData->DeviceSymbolicLinkName.get(), MY_EDR_DOS_DEVICE_NAME);
-    RETURN_STATUS_ON_BAD_STATUS(IoCreateSymbolicLink(myEdrData->DeviceSymbolicLink.get(), &deviceName));
+    RETURN_STATUS_ON_BAD_STATUS(IoCreateSymbolicLink(myEdrData->DeviceSymbolicLinkName.get(), &deviceName));
     myEdrData->DeviceSymbolicLink = myEdrData->DeviceSymbolicLinkName.get();
 
     driverObject->MajorFunction[IRP_MJ_CLOSE] = driverObject->MajorFunction[IRP_MJ_CREATE] = MyEdrCreateClose;
