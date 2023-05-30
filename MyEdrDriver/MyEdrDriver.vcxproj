@@ -235,7 +235,7 @@
     <ClInclude Include="Mutex.h" />
     <ClInclude Include="Debug.h" />
     <ClInclude Include="Memory.h" />
-    <ClInclude Include="MyEdrEvent.h" />
+    <ClInclude Include="MyEdrDriver.h" />
     <ClInclude Include="Result.h" />
     <ClInclude Include="Statuses.h" />
     <ClInclude Include="Utility.h" />

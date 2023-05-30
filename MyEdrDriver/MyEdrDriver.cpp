@@ -1,10 +1,10 @@
 #include <fltKernel.h>
 #include <ntddk.h>
 
+#include "MyEdrDriver.h"
 #include "Queue.h"
 #include "Result.h"
 #include "AutoDeletedPointer.h"
-#include "MyEdrEvent.h"
 #include "Mutex.h"
 #include "Lock.h"
 #include "AvlTable.h"
