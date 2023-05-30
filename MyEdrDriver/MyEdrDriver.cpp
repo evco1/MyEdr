@@ -100,6 +100,7 @@ void MyEdrCreateProcessNotifyRoutine(
 
     const Lock lock(g_myEdrData->Mutex);
     AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ static_cast<ULONG>(reinterpret_cast<ULONG64>(processId)) };
+    RETURN_ON_CONDITION(nullptr == copiedProcessId, );
     RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()), );
     copiedProcessId.release();
 }
