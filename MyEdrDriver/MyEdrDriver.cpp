@@ -14,6 +14,8 @@ const UINT32 MY_EDR_FILTER_CONTEXT_POOL_TAG = 'cfem';
 const size_t MY_EDR_MAX_EVENT_QUEUE_ENTRY_COUNT = 10000;
 const MyEdrVersion MY_EDR_VERSION = { 1, 0, 0 };
 const wchar_t MY_EDR_INITIAL_BLACKLIST_PROCESS_NAME[] = L"notepad.exe";
+const wchar_t MY_EDR_DEVICE_NAME[] = L"\\Device\\MYEDRDRIVER";
+const wchar_t MY_EDR_DOS_DEVICE_NAME[] = L"\\DosDevices\\MyEdrDriverIoCtl";
 
 NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX processNotifyRoutine)
 {
@@ -199,11 +201,6 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostWrite(
     return HandleFilterCallback(FileWrite, data);
 }
 
-void CompleteRequest(PIRP irp)
-{
-    IoCompleteRequest(irp, IO_NO_INCREMENT);
-}
-
 NTSTATUS MyEdrCreateClose(
     PDEVICE_OBJECT deviceObject,
     PIRP irp
@@ -219,15 +216,8 @@ NTSTATUS MyEdrCreateClose(
     return STATUS_SUCCESS;
 }
 
-NTSTATUS MyEdrDeviceControl(
-    PDEVICE_OBJECT deviceObject,
-    PIRP irp
-)
+NTSTATUS HandleIoControl(PIRP irp)
 {
-    UNREFERENCED_PARAMETER(deviceObject);
-
-    AutoDeletedPointer<IRP, decltype(CompleteRequest), CompleteRequest> request;
-
     const PIO_STACK_LOCATION irpStackLocation = IoGetCurrentIrpStackLocation(irp);
 
     PVOID buffer = irp->AssociatedIrp.SystemBuffer;
@@ -239,6 +229,7 @@ NTSTATUS MyEdrDeviceControl(
     {
         RETURN_ON_CONDITION(sizeof(MyEdrVersion) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
         *static_cast<MyEdrVersion*>(buffer) = MY_EDR_VERSION;
+        irp->IoStatus.Information = sizeof(MyEdrVersion);
         break;
     }
     case SYSCTL_GET_EVENTS:
@@ -248,6 +239,7 @@ NTSTATUS MyEdrDeviceControl(
         Result<MyEdrEvent> myEdrEvent = g_myEdrData->EventQueue.popHead();
         RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
         *static_cast<MyEdrEvent*>(buffer) = *myEdrEvent;
+        irp->IoStatus.Information = sizeof(MyEdrEvent);
         break;
     }
     case SYSCTL_ADD_BLACK:
@@ -259,6 +251,7 @@ NTSTATUS MyEdrDeviceControl(
         RETURN_STATUS_ON_BAD_STATUS(copiedUnicodeString->copyFrom(static_cast<MyEdrBlacklistProcess*>(buffer)->Name));
         RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessNames.insertElement(copiedUnicodeString.get()));
         copiedUnicodeString.release();
+        irp->IoStatus.Information = 0;
         break;
     }
     default:
@@ -268,6 +261,18 @@ NTSTATUS MyEdrDeviceControl(
     }
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS MyEdrDeviceControl(
+    PDEVICE_OBJECT deviceObject,
+    PIRP irp
+)
+{
+    UNREFERENCED_PARAMETER(deviceObject);
+
+    irp->IoStatus.Status = HandleIoControl(irp);
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+    return irp->IoStatus.Status;
 }
 
 void DriverUnload(
