@@ -13,8 +13,9 @@
 #include <wdm.h>
 
 const UINT32 MY_EDR_FILTER_CONTEXT_POOL_TAG = 'cfem';
-const size_t MAX_EVENT_QUEUE_ENTRY_COUNT = 10000;
-const MyEdrVersion VERSION = { 1, 0, 0 };
+const size_t MY_EDR_MAX_EVENT_QUEUE_ENTRY_COUNT = 10000;
+const MyEdrVersion MY_EDR_VERSION = { 1, 0, 0 };
+const wchar_t MY_EDR_INITIAL_BLACKLIST_PROCESS_NAME[] = L"notepad.exe";
 
 NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX processNotifyRoutine)
 {
@@ -103,9 +104,12 @@ void MyEdrCreateProcessNotifyRoutine(
         {
             AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ reinterpret_cast<const ULONG&>(processId) };
 
-            if (NT_SUCCESS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get())))
+            if (nullptr != g_myEdrData)
             {
-                copiedProcessId.release();
+                if (NT_SUCCESS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get())))
+                {
+                    copiedProcessId.release();
+                }
             }
         }
     }
@@ -228,7 +232,7 @@ NTSTATUS MyEdrDeviceControl(
     case SYSCTL_GET_VERSION:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrVersion) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
-        *static_cast<MyEdrVersion*>(buffer) = VERSION;
+        *static_cast<MyEdrVersion*>(buffer) = MY_EDR_VERSION;
         break;
     }
     case SYSCTL_GET_EVENTS:
@@ -278,12 +282,17 @@ extern "C" NTSTATUS DriverEntry(
     UNREFERENCED_PARAMETER(registryPath);
 
     AutoDeletedPointer<MyEdrData> myEdrData = new MyEdrData {
-        { MAX_EVENT_QUEUE_ENTRY_COUNT }
+        { MY_EDR_MAX_EVENT_QUEUE_ENTRY_COUNT }
     };
 
-    if (nullptr == myEdrData.get()) {
-        return STATUS_INSUFFICIENT_RESOURCES;
-    }
+    RETURN_ON_CONDITION(nullptr == myEdrData, STATUS_INSUFFICIENT_RESOURCES);
+
+    AutoDeletedPointer<UnicodeString> blacklistProcessName = new UnicodeString;
+    RETURN_ON_CONDITION(nullptr == blacklistProcessName, STATUS_INSUFFICIENT_RESOURCES);
+
+    RETURN_STATUS_ON_BAD_STATUS(blacklistProcessName->copyFrom(MY_EDR_INITIAL_BLACKLIST_PROCESS_NAME));
+    RETURN_STATUS_ON_BAD_STATUS(myEdrData->BlacklistProcessNames.insertElement(blacklistProcessName.get()));
+    blacklistProcessName.release();
 
     // It's very important that g_myEdrData will be already initialized here because from this point,
     // a callback can be called and g_myEdrData is being accessed from the callbacks.
