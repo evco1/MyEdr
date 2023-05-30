@@ -22,7 +22,7 @@ NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX pro
 
 struct MyEdrData final
 {
-    Queue<AutoDeletedPointer<MyEdrEvent>> EventQueue;
+    Queue<MyEdrEvent> EventQueue;
     AvlTable<ULONG> BlacklistProcessIds;
     Mutex Mutex;
     AutoDeletedPointer<
@@ -73,7 +73,8 @@ NTSTATUS MyEdrPushEventToQueue(AutoDeletedPointer<MyEdrEvent>&& myEdrEvent)
         g_myEdrData->EventQueue.popHead();
     }
 
-    RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->EventQueue.pushTail(move(myEdrEvent)));
+    RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->EventQueue.pushTail(myEdrEvent.get()));
+    myEdrEvent.release();
 
     return STATUS_SUCCESS;
 }
@@ -98,7 +99,9 @@ void MyEdrCreateProcessNotifyRoutine(
     myEdrEvent.release();
 
     const Lock lock(g_myEdrData->Mutex);
-    g_myEdrData->BlacklistProcessIds.insertElement(static_cast<ULONG>(reinterpret_cast<ULONG64>(processId)));
+    AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ static_cast<ULONG>(reinterpret_cast<ULONG64>(processId)) };
+    RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()), );
+    copiedProcessId.release();
 }
 
 FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
@@ -128,7 +131,7 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
 
     {
         const Lock lock(g_myEdrData->Mutex);
-        RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.containsElement(processId), FLT_POSTOP_FINISHED_PROCESSING);
+        RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.containsElement(&processId), FLT_POSTOP_FINISHED_PROCESSING);
     }
 
     AutoDeletedPointer<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(eventId, processId, &nameInfo->Name);
@@ -207,23 +210,26 @@ NTSTATUS MyEdrDeviceControl(
     case SYSCTL_GET_VERSION:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrVersion) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
-        RtlCopyMemory(buffer, &VERSION, sizeof(VERSION));
+        *static_cast<MyEdrVersion*>(buffer) = VERSION;
         break;
     }
     case SYSCTL_GET_EVENTS:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrEvent) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
         const Lock lock(g_myEdrData->Mutex);
-        Result<AutoDeletedPointer<MyEdrEvent>> myEdrEvent = g_myEdrData->EventQueue.popHead();
+        Result<MyEdrEvent> myEdrEvent = g_myEdrData->EventQueue.popHead();
         RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
-        RtlCopyMemory(buffer, &*myEdrEvent, sizeof(MyEdrEvent));
+        *static_cast<MyEdrEvent*>(buffer) = *myEdrEvent;
         break;
     }
     case SYSCTL_ADD_BLACK:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrBlacklistProcess) > irpStackLocation->Parameters.DeviceIoControl.InputBufferLength, STATUS_INVALID_PARAMETER);
         const Lock lock(g_myEdrData->Mutex);
-        g_myEdrData->BlacklistProcessIds.insertElement(static_cast<MyEdrBlacklistProcess*>(buffer)->ProcessId);
+        AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ static_cast<MyEdrBlacklistProcess*>(buffer)->ProcessId };
+        RETURN_ON_CONDITION(nullptr == copiedProcessId, STATUS_INSUFFICIENT_RESOURCES);
+        RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()));
+        copiedProcessId.release();
         break;
     }
     default:

@@ -3,7 +3,7 @@
 #include <ntddk.h>
 
 #include "Memory.h"
-#include "AutoDeletedPointer.h"
+#include "Statuses.h"
 
 template <class DataType>
 class AvlTable final
@@ -18,14 +18,14 @@ public:
 	AvlTable& operator=(const AvlTable&) = delete;
 	AvlTable& operator=(AvlTable&&) = delete;
 
-	bool insertElement(const DataType& data);
-	bool insertElement(DataType&& data);
+	NTSTATUS insertElement(DataType* data);
 
-	bool deleteElement(const DataType& data);
+	Result<DataType> deleteElement(const DataType* data);
 
-	DataType* findElement(const DataType& data) const;
+	const DataType* findElement(const DataType* data) const;
+	DataType* findElement(const DataType* data);
 
-	bool containsElement(const DataType& data) const;
+	bool containsElement(const DataType* data) const;
 
 	void clear();
 
@@ -57,44 +57,53 @@ AvlTable<DataType>::~AvlTable()
 }
 
 template <class DataType>
-bool AvlTable<DataType>::insertElement(const DataType& data)
+NTSTATUS AvlTable<DataType>::insertElement(DataType* data)
 {
-	DataType copiedData = data;
-	return insertElement(move(copiedData));
+	RETURN_ON_CONDITION(nullptr == data, false);
+	RETURN_ON_CONDITION(
+		nullptr == RtlInsertElementGenericTableAvl(&m_table, &data, sizeof(DataType*), nullptr),
+		{ STATUS_MY_EDR_AVL_TABLE_INSERT_ELEMENT_FAILED }
+	);
+	
+	return STATUS_SUCCESS;
 }
 
 template <class DataType>
-bool AvlTable<DataType>::insertElement(DataType&& data)
+Result<DataType> AvlTable<DataType>::deleteElement(const DataType* data)
 {
-	AutoDeletedPointer<DataType> movedData = new DataType{ move(data) };
-	RETURN_ON_CONDITION(nullptr == movedData, false);
-	RETURN_ON_CONDITION(nullptr == RtlInsertElementGenericTableAvl(&m_table, &movedData.get(), sizeof(DataType*), nullptr), false);
-	movedData.release();
-	return true;
+	DataType* foundData = findElement(data);
+	RETURN_ON_CONDITION(nullptr == foundData, { STATUS_MY_EDR_AVL_TABLE_ELEMENT_WAS_NOT_FOUND });
+	RETURN_ON_CONDITION(
+		!RtlDeleteElementGenericTableAvl(&m_table, &data),
+		{ STATUS_MY_EDR_AVL_TABLE_DELETE_ELEMENT_FAILED }
+	);
+	return foundData;
 }
 
 template <class DataType>
-bool AvlTable<DataType>::deleteElement(const DataType& data)
+const DataType* AvlTable<DataType>::findElement(const DataType* data) const
 {
-	AutoDeletedPointer<DataType> foundData = findElement(data);
-	RETURN_ON_CONDITION(nullptr == foundData, false);
-	return RtlDeleteElementGenericTableAvl(&m_table, &foundData);
-}
-
-template <class DataType>
-DataType* AvlTable<DataType>::findElement(const DataType& data) const
-{
-	const DataType* pData = &data;
 	DataType** foundData = static_cast<DataType**>(RtlLookupElementGenericTableAvl(
 		const_cast<PRTL_AVL_TABLE>(&m_table),
-		const_cast<DataType**>(&pData)
+		const_cast<DataType**>(&data)
 	));
 	RETURN_ON_CONDITION(nullptr == foundData, nullptr);
 	return *foundData;
 }
 
 template <class DataType>
-bool AvlTable<DataType>::containsElement(const DataType& data) const
+DataType* AvlTable<DataType>::findElement(const DataType* data)
+{
+	DataType** foundData = static_cast<DataType**>(RtlLookupElementGenericTableAvl(
+		const_cast<PRTL_AVL_TABLE>(&m_table),
+		const_cast<DataType**>(&data)
+	));
+	RETURN_ON_CONDITION(nullptr == foundData, nullptr);
+	return *foundData;
+}
+
+template <class DataType>
+bool AvlTable<DataType>::containsElement(const DataType* data) const
 {
 	return nullptr != findElement(data);
 }
@@ -105,7 +114,7 @@ void AvlTable<DataType>::clear()
 	DataType** data = static_cast<DataType**>(RtlEnumerateGenericTableAvl(&m_table, TRUE));
 
 	while (nullptr != data) {
-		deleteElement(**data);
+		deleteElement(*data);
 		data = static_cast<DataType**>(RtlEnumerateGenericTableAvl(&m_table, TRUE));
 	}
 }

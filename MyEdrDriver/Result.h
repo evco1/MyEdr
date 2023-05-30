@@ -23,21 +23,19 @@ ENFORCE_SEMICOLON
 
 #define RETURN_ON_BAD_RESULT(expression, returnValue) RETURN_ON_BAD_STATUS(expression.getStatus(), returnValue)
 
-template <
-	class DataType,
-	class AllocatedDataType = AutoDeletedPointer<DataType>
->
+template <class DataType>
 class Result final
 {
 public:
+	using AllocatedDataType = AutoDeletedPointer<DataType>;
+
 	Result(NTSTATUS status = STATUS_SUCCESS);
 	Result(const Result&) = delete;
 	Result(Result&&) = default;
-	Result(const DataType& data, NTSTATUS status = STATUS_SUCCESS);
-	Result(DataType&& data, NTSTATUS status = STATUS_SUCCESS);
+	Result(DataType* data, NTSTATUS status = STATUS_SUCCESS);
 
 	Result& operator=(const Result&) = delete;
-	Result& operator=(Result&&);
+	Result& operator=(Result&&) = default;
 
 	const DataType& operator*() const;
 	DataType& operator*();
@@ -47,80 +45,58 @@ public:
 
 	NTSTATUS getStatus() const;
 
+	DataType* releaseData();
+
 private:
 	AllocatedDataType m_data;
 	NTSTATUS m_status;
 };
 
-template <class DataType, class AllocatedDataType>
-Result<DataType, AllocatedDataType>::Result(const NTSTATUS status) :
+template <class DataType>
+Result<DataType>::Result(const NTSTATUS status) :
 	m_status{ status }
 {
 }
 
-template <class DataType, class AllocatedDataType>
-Result<DataType, AllocatedDataType>::Result(const DataType& data, NTSTATUS status)
+template <class DataType>
+Result<DataType>::Result(DataType* data, const NTSTATUS status) :
+	m_data{ data },
+	m_status { status }
 {
-	m_data = new DataType{ data };
-
-	if (m_data.isAllocated())
-	{
-		m_status = STATUS_INSUFFICIENT_RESOURCES;
-		return;
-	}
-
-	m_status = status;
 }
 
-template <class DataType, class AllocatedDataType>
-Result<DataType, AllocatedDataType>::Result(DataType&& data, const NTSTATUS status)
-{
-	m_data = new DataType{ move(data) };
-
-	if (nullptr == m_data)
-	{
-		m_status = STATUS_INSUFFICIENT_RESOURCES;
-		return;
-	}
-
-	m_status = status;
-}
-
-template <class DataType, class AllocatedDataType>
-Result<DataType, AllocatedDataType>& Result<DataType, AllocatedDataType>::operator=(Result&& other)
-{
-	m_data.allocate();
-	m_status = other.m_status;
-	m_data = move(other.m_data);
-	return *this;
-}
-
-template <class DataType, class AllocatedDataType>
-const DataType& Result<DataType, AllocatedDataType>::operator*() const
+template <class DataType>
+const DataType& Result<DataType>::operator*() const
 {
 	return *m_data;
 }
 
-template <class DataType, class AllocatedDataType>
-DataType& Result<DataType, AllocatedDataType>::operator*()
+template <class DataType>
+DataType& Result<DataType>::operator*()
 {
 	return *m_data;
 }
 
-template <class DataType, class AllocatedDataType>
-const DataType* Result<DataType, AllocatedDataType>::operator->() const
+template <class DataType>
+const DataType* Result<DataType>::operator->() const
 {
 	return m_data.get();
 }
 
-template <class DataType, class AllocatedDataType>
-DataType* Result<DataType, AllocatedDataType>::operator->()
+template <class DataType>
+DataType* Result<DataType>::operator->()
 {
 	return m_data.get();
 }
 
-template <class DataType, class AllocatedDataType>
-NTSTATUS Result<DataType, AllocatedDataType>::getStatus() const
+template <class DataType>
+NTSTATUS Result<DataType>::getStatus() const
 {
 	return m_status;
+}
+
+template <class DataType>
+DataType* Result<DataType>::releaseData()
+{
+	return m_data.release();
 }

@@ -26,8 +26,7 @@ public:
 	bool isEmpty() const;
 	bool isFull() const;
 
-	NTSTATUS pushTail(const DataType& data);
-	NTSTATUS pushTail(DataType&& data);
+	NTSTATUS pushTail(DataType* data);
 
 	Result<DataType> popHead();
 
@@ -39,7 +38,7 @@ private:
 	struct QueueEntry
 	{
 		LIST_ENTRY ListEntry;
-		DataType Data;
+		DataType* Data;
 	};
 #pragma pack(pop)
 
@@ -99,18 +98,12 @@ bool Queue<DataType>::isFull() const
 }
 
 template <class DataType>
-NTSTATUS Queue<DataType>::pushTail(const DataType& data)
+NTSTATUS Queue<DataType>::pushTail(DataType* data)
 {
-	DataType copiedData = data;
-	return pushTail(move(copiedData));
-}
-
-template <class DataType>
-NTSTATUS Queue<DataType>::pushTail(DataType&& data)
-{
+	RETURN_ON_CONDITION(nullptr == data, STATUS_INVALID_PARAMETER);
 	RETURN_ON_CONDITION(isFull(), STATUS_MY_EDR_QUEUE_IS_FULL);
 
-	QueueEntryPointer queueEntry = new QueueEntry{ {}, move(data) };
+	QueueEntryPointer queueEntry = new QueueEntry{ {}, data };
 	RETURN_ON_CONDITION(nullptr == queueEntry, STATUS_INSUFFICIENT_RESOURCES);
 
 	InsertTailList(&m_head, &queueEntry->ListEntry);
@@ -130,7 +123,7 @@ Result<DataType> Queue<DataType>::popHead()
 	QueueEntryPointer queueEntry = reinterpret_cast<QueueEntry*>(RemoveHeadList(&m_head));
 	--m_currentEntryCount;
 
-	return move(queueEntry->Data);
+	return queueEntry->Data;
 }
 
 template <class DataType>
