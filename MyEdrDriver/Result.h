@@ -45,11 +45,14 @@ public:
 
 	NTSTATUS getStatus() const;
 
+	const DataType* getData() const;
+	DataType* getData();
+
 	DataType* releaseData();
 
 private:
-	AllocatedDataType m_data;
 	NTSTATUS m_status;
+	AllocatedDataType m_data;
 };
 
 template <class DataType>
@@ -60,8 +63,8 @@ Result<DataType>::Result(const NTSTATUS status) :
 
 template <class DataType>
 Result<DataType>::Result(DataType* data, const NTSTATUS status) :
-	m_data{ data },
-	m_status { status }
+	m_status{ status },
+	m_data{ data }
 {
 }
 
@@ -93,6 +96,18 @@ template <class DataType>
 NTSTATUS Result<DataType>::getStatus() const
 {
 	return m_status;
+}
+
+template <class DataType>
+const DataType* Result<DataType>::getData() const
+{
+	return m_data.get();
+}
+
+template <class DataType>
+DataType* Result<DataType>::getData()
+{
+	return m_data.get();
 }
 
 template <class DataType>

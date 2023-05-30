@@ -44,7 +44,7 @@ struct MyEdrData final
 
 MyEdrData* g_myEdrData{ nullptr };
 
-AutoDeletedPointer<MyEdrEvent> MyEdrCreateEvent(
+Result<MyEdrEvent> MyEdrCreateEvent(
     const MyEdrEventId eventId,
     const ULONG processId,
     const UNICODE_STRING* name
@@ -54,7 +54,7 @@ AutoDeletedPointer<MyEdrEvent> MyEdrCreateEvent(
         eventId,
         processId
     };
-    RETURN_ON_CONDITION(nullptr == myEdrEvent, {});
+    RETURN_ON_CONDITION(nullptr == myEdrEvent, { STATUS_INSUFFICIENT_RESOURCES });
 
     KeQuerySystemTime(&myEdrEvent->TimeStamp);
 
@@ -62,10 +62,10 @@ AutoDeletedPointer<MyEdrEvent> MyEdrCreateEvent(
     RtlCopyUnicodeString(&copiedName, name);
     myEdrEvent->Name[copiedName.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
-    return myEdrEvent;
+    return { myEdrEvent.release() };
 }
 
-NTSTATUS MyEdrPushEventToQueue(AutoDeletedPointer<MyEdrEvent>&& myEdrEvent)
+NTSTATUS MyEdrPushEventToQueue(MyEdrEvent* myEdrEvent)
 {
     const Lock lock(g_myEdrData->Mutex);
 
@@ -73,8 +73,7 @@ NTSTATUS MyEdrPushEventToQueue(AutoDeletedPointer<MyEdrEvent>&& myEdrEvent)
         g_myEdrData->EventQueue.popHead();
     }
 
-    RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->EventQueue.pushTail(myEdrEvent.get()));
-    myEdrEvent.release();
+    RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->EventQueue.pushTail(myEdrEvent));
 
     return STATUS_SUCCESS;
 }
@@ -87,22 +86,16 @@ void MyEdrCreateProcessNotifyRoutine(
 {
     UNREFERENCED_PARAMETER(process);
 
-    AutoDeletedPointer<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(
+    Result<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(
         nullptr == createInfo ? ProcessExit : ProcessCreate,
         static_cast<ULONG>(reinterpret_cast<ULONG64>(processId)),
         nullptr == createInfo ? nullptr : createInfo->ImageFileName
     );
 
-    RETURN_ON_CONDITION(nullptr == myEdrEvent, );
+    RETURN_ON_BAD_RESULT(myEdrEvent, );
+    RETURN_ON_BAD_STATUS(MyEdrPushEventToQueue(myEdrEvent.getData()), );
 
-    MyEdrPushEventToQueue(move(myEdrEvent));
-    myEdrEvent.release();
-
-    const Lock lock(g_myEdrData->Mutex);
-    AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ static_cast<ULONG>(reinterpret_cast<ULONG64>(processId)) };
-    RETURN_ON_CONDITION(nullptr == copiedProcessId, );
-    RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()), );
-    copiedProcessId.release();
+    myEdrEvent.releaseData();
 }
 
 FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
@@ -135,11 +128,11 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
         RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.containsElement(&processId), FLT_POSTOP_FINISHED_PROCESSING);
     }
 
-    AutoDeletedPointer<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(eventId, processId, &nameInfo->Name);
-    RETURN_ON_CONDITION(nullptr == myEdrEvent, FLT_POSTOP_FINISHED_PROCESSING);
+    Result<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(eventId, processId, &nameInfo->Name);
+    RETURN_ON_BAD_RESULT(myEdrEvent, FLT_POSTOP_FINISHED_PROCESSING);
 
-    MyEdrPushEventToQueue(move(myEdrEvent));
-    myEdrEvent.release();
+    RETURN_ON_BAD_STATUS(MyEdrPushEventToQueue(myEdrEvent.getData()), FLT_POSTOP_FINISHED_PROCESSING);
+    myEdrEvent.releaseData();
 
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
