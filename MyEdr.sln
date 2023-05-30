@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.33529.622
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MyEdrDriver", "MyEdrDriver\MyEdrDriver.vcxproj", "{DEFAAA64-1C67-4326-9964-83635AB0C997}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MyEdrService", "MyEdrService\MyEdrService.vcxproj", "{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -41,6 +43,18 @@ Global
 		{DEFAAA64-1C67-4326-9964-83635AB0C997}.Release|x86.ActiveCfg = Release|Win32
 		{DEFAAA64-1C67-4326-9964-83635AB0C997}.Release|x86.Build.0 = Release|Win32
 		{DEFAAA64-1C67-4326-9964-83635AB0C997}.Release|x86.Deploy.0 = Release|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Debug|ARM.ActiveCfg = Debug|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Debug|x64.ActiveCfg = Debug|x64
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Debug|x64.Build.0 = Debug|x64
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Debug|x86.ActiveCfg = Debug|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Debug|x86.Build.0 = Debug|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Release|ARM.ActiveCfg = Release|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Release|ARM64.ActiveCfg = Release|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Release|x64.ActiveCfg = Release|x64
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Release|x64.Build.0 = Release|x64
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Release|x86.ActiveCfg = Release|Win32
+		{40D9980C-E4B8-4188-AED8-BC8BDEAADB88}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

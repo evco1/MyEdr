@@ -26,22 +26,27 @@ struct MyEdrData final
     AvlTable<UnicodeString> BlacklistProcessNames;
     AvlTable<ULONG> BlacklistProcessIds;
     Mutex Mutex;
+
     AutoDeletedPointer<
         remove_reference_t<PCREATE_PROCESS_NOTIFY_ROUTINE_EX>,
         decltype(CreateProcessNotifyRoutineDeleter),
         CreateProcessNotifyRoutineDeleter
     > CreateProcessNotifyRoutine;
+
     AutoDeletedPointer<
         remove_reference_t<PFLT_FILTER>,
         decltype(FltUnregisterFilter),
         FltUnregisterFilter
     > Filter;
+
     AutoDeletedPointer<
         DEVICE_OBJECT,
         decltype(IoDeleteDevice),
         IoDeleteDevice
     > Device;
+
     AutoDeletedPointer<UNICODE_STRING> DeviceSymbolicLinkName;
+
     AutoDeletedPointer<
         UNICODE_STRING,
         decltype(IoDeleteSymbolicLink),
@@ -279,13 +284,11 @@ extern "C" NTSTATUS DriverEntry(
     PUNICODE_STRING registryPath
 )
 {
-    UNREFERENCED_PARAMETER(driverObject);
     UNREFERENCED_PARAMETER(registryPath);
 
-    AutoDeletedPointer<MyEdrData> myEdrData = new MyEdrData {
+    AutoDeletedPointer<MyEdrData> myEdrData = new MyEdrData{
         { MY_EDR_MAX_EVENT_QUEUE_ENTRY_COUNT }
     };
-
     RETURN_ON_CONDITION(nullptr == myEdrData, STATUS_INSUFFICIENT_RESOURCES);
 
     AutoDeletedPointer<UnicodeString> blacklistProcessName = new UnicodeString;
@@ -335,8 +338,8 @@ extern "C" NTSTATUS DriverEntry(
         driverObject,
         0,
         &deviceName,
-        FILE_DEVICE_CONTROLLER,
-        0,
+        FILE_DEVICE_UNKNOWN,
+        FILE_DEVICE_SECURE_OPEN,
         FALSE,
         &myEdrData->Device.get()
     ));
@@ -347,9 +350,9 @@ extern "C" NTSTATUS DriverEntry(
     RETURN_STATUS_ON_BAD_STATUS(IoCreateSymbolicLink(myEdrData->DeviceSymbolicLink.get(), &deviceName));
     myEdrData->DeviceSymbolicLink = myEdrData->DeviceSymbolicLinkName.get();
 
-    driverObject->DriverUnload = DriverUnload;
     driverObject->MajorFunction[IRP_MJ_CLOSE] = driverObject->MajorFunction[IRP_MJ_CREATE] = MyEdrCreateClose;
     driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = MyEdrDeviceControl;
+    driverObject->DriverUnload = DriverUnload;
 
     myEdrData.release();
 
