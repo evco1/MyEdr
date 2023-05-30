@@ -213,6 +213,7 @@ NTSTATUS MyEdrDeviceControl(
     case SYSCTL_GET_EVENTS:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrEvent) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
+        const Lock lock(g_myEdrData->Mutex);
         Result<AutoDeletedPointer<MyEdrEvent>> myEdrEvent = g_myEdrData->EventQueue.popHead();
         RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
         RtlCopyMemory(buffer, &*myEdrEvent, sizeof(MyEdrEvent));
@@ -221,6 +222,7 @@ NTSTATUS MyEdrDeviceControl(
     case SYSCTL_ADD_BLACK:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrBlacklistProcess) > irpStackLocation->Parameters.DeviceIoControl.InputBufferLength, STATUS_INVALID_PARAMETER);
+        const Lock lock(g_myEdrData->Mutex);
         g_myEdrData->BlacklistProcessIds.insertElement(static_cast<MyEdrBlacklistProcess*>(buffer)->ProcessId);
         break;
     }
