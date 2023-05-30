@@ -31,6 +31,12 @@
     <ClCompile Include="UnicodeString.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AvlTable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SpinLock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AutoDeletedPointer.h">
@@ -70,6 +76,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UnicodeString.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpinLock.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

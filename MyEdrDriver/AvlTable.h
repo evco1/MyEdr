@@ -4,6 +4,7 @@
 
 #include "Memory.h"
 #include "Statuses.h"
+#include "Result.h"
 
 template <class DataType>
 class AvlTable final

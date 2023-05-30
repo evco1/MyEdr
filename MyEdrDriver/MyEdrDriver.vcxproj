@@ -35,8 +35,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AvlTable.cpp" />
     <ClCompile Include="Mutex.cpp" />
     <ClCompile Include="Memory.cpp" />
+    <ClCompile Include="SpinLock.cpp" />
     <ClCompile Include="UnicodeString.cpp" />
     <ResourceCompile Include="MyEdrDriver.rc" />
     <ClCompile Include="MyEdrDriver.cpp" />
@@ -238,6 +240,7 @@
     <ClInclude Include="Memory.h" />
     <ClInclude Include="MyEdrDriver.h" />
     <ClInclude Include="Result.h" />
+    <ClInclude Include="SpinLock.h" />
     <ClInclude Include="Statuses.h" />
     <ClInclude Include="UnicodeString.h" />
     <ClInclude Include="Utility.h" />

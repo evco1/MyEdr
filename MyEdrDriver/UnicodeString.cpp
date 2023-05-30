@@ -1,3 +1,5 @@
+#include <ntifs.h>
+
 #include "UnicodeString.h"
 #include "Result.h"
 
@@ -12,8 +14,8 @@ UnicodeString::UnicodeString() :
 int UnicodeString::operator<=>(const UnicodeString& other) const
 {
 	ULONG hash, otherHash;
-	RETURN_ON_BAD_STATUS(RtlHashUnicodeString(&m_unicodeString, TRUE, HASH_STRING_ALGORITHM_DEFAULT, &hash), -1);
-	RETURN_ON_BAD_STATUS(RtlHashUnicodeString(&other.m_unicodeString, TRUE, HASH_STRING_ALGORITHM_DEFAULT, &otherHash), 1);
+	RETURN_ON_BAD_STATUS(RtlHashUnicodeString(&m_unicodeString, FALSE, HASH_STRING_ALGORITHM_DEFAULT, &hash), -1);
+	RETURN_ON_BAD_STATUS(RtlHashUnicodeString(&other.m_unicodeString, FALSE, HASH_STRING_ALGORITHM_DEFAULT, &otherHash), 1);
 	
 	if (hash < otherHash) {
 		return -1;
@@ -24,6 +26,31 @@ int UnicodeString::operator<=>(const UnicodeString& other) const
 	}
 
 	return 0;
+}
+
+const UNICODE_STRING& UnicodeString::get() const
+{
+	return m_unicodeString;
+}
+
+UNICODE_STRING& UnicodeString::get()
+{
+	return m_unicodeString;
+}
+
+const wchar_t* UnicodeString::getRaw() const
+{
+	return m_rawUnicodeString.get();
+}
+
+wchar_t* UnicodeString::getRaw()
+{
+	return m_rawUnicodeString.get();
+}
+
+size_t UnicodeString::length() const
+{
+	return m_unicodeString.Length / sizeof(wchar_t);
 }
 
 NTSTATUS UnicodeString::copyFrom(const UnicodeString& other)
@@ -57,27 +84,7 @@ NTSTATUS UnicodeString::copyFrom(const wchar_t* rawUnicodeString)
 	return copyFrom(unicodeString);
 }
 
-size_t UnicodeString::length() const
+NTSTATUS UnicodeString::toLowercase()
 {
-	return m_unicodeString.Length / sizeof(wchar_t);
-}
-
-const UNICODE_STRING& UnicodeString::get() const
-{
-	return m_unicodeString;
-}
-
-UNICODE_STRING& UnicodeString::get()
-{
-	return m_unicodeString;
-}
-
-const wchar_t* UnicodeString::getRaw() const
-{
-	return m_rawUnicodeString.get();
-}
-
-wchar_t* UnicodeString::getRaw()
-{
-	return m_rawUnicodeString.get();
+	return RtlDowncaseUnicodeString(&m_unicodeString, &m_unicodeString, FALSE);
 }

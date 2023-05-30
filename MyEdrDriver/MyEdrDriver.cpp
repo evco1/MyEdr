@@ -5,7 +5,7 @@
 #include "Queue.h"
 #include "Result.h"
 #include "AutoDeletedPointer.h"
-#include "Mutex.h"
+#include "SpinLock.h"
 #include "Lock.h"
 #include "AvlTable.h"
 #include "UnicodeString.h"
@@ -27,7 +27,7 @@ struct MyEdrData final
     Queue<MyEdrEvent> EventQueue;
     AvlTable<UnicodeString> BlacklistProcessNames;
     AvlTable<ULONG> BlacklistProcessIds;
-    Mutex Mutex;
+    SpinLock SpinLock;
 
     AutoDeletedPointer<
         remove_reference_t<PCREATE_PROCESS_NOTIFY_ROUTINE_EX>,
@@ -47,7 +47,7 @@ struct MyEdrData final
         IoDeleteDevice
     > Device;
 
-    AutoDeletedPointer<UNICODE_STRING> DeviceSymbolicLinkName;
+    UNICODE_STRING DeviceSymbolicLinkName;
 
     AutoDeletedPointer<
         UNICODE_STRING,
@@ -81,7 +81,7 @@ Result<MyEdrEvent> MyEdrCreateEvent(
 
 NTSTATUS MyEdrPushEventToQueue(MyEdrEvent* myEdrEvent)
 {
-    const Lock lock{ g_myEdrData->Mutex };
+    const Lock lock{ g_myEdrData->SpinLock };
 
     if (g_myEdrData->EventQueue.isFull()) {
         g_myEdrData->EventQueue.popHead();
@@ -92,34 +92,56 @@ NTSTATUS MyEdrPushEventToQueue(MyEdrEvent* myEdrEvent)
     return STATUS_SUCCESS;
 }
 
+NTSTATUS AddNewProcessToBlacklistIfNeeded(
+    ULONG processId,
+    const PPS_CREATE_NOTIFY_INFO createInfo
+)
+{
+    PWCHAR fileName = createInfo->ImageFileName->Buffer + ((createInfo->ImageFileName->Length / sizeof(WCHAR)) - 1);
+
+    while (fileName >= createInfo->ImageFileName->Buffer)
+    {
+        if (*fileName == L'\\')
+        {
+            break;
+        }
+
+        --fileName;
+    }
+
+    ++fileName;
+
+    UnicodeString copiedFileName;
+    RETURN_STATUS_ON_BAD_STATUS(copiedFileName.copyFrom(fileName));
+    RETURN_STATUS_ON_BAD_STATUS(copiedFileName.toLowercase());
+
+    const Lock lock = { g_myEdrData->SpinLock };
+    RETURN_ON_CONDITION(!g_myEdrData->BlacklistProcessNames.containsElement(&copiedFileName), STATUS_SUCCESS);
+    AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ processId };
+    RETURN_ON_CONDITION(nullptr == g_myEdrData, STATUS_INSUFFICIENT_RESOURCES);
+    RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()));
+    copiedProcessId.release();
+    return STATUS_SUCCESS;
+}
+
 void MyEdrCreateProcessNotifyRoutine(
     const PEPROCESS process,
     const HANDLE processId,
     const PPS_CREATE_NOTIFY_INFO createInfo
 )
 {
+    PAGED_CODE();
+
     UNREFERENCED_PARAMETER(process);
 
     if (nullptr == createInfo)
     {
-        const Lock lock = { g_myEdrData->Mutex };
+        const Lock lock = { g_myEdrData->SpinLock };
         g_myEdrData->BlacklistProcessIds.deleteElement(&reinterpret_cast<const ULONG&>(processId));
     }
     else
     {
-        UnicodeString processName;
-        processName.copyFrom(*createInfo->ImageFileName);
-
-        const Lock lock = { g_myEdrData->Mutex };
-        if (g_myEdrData->BlacklistProcessNames.containsElement(&processName)) {
-            AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ reinterpret_cast<const ULONG&>(processId) };
-
-            if (nullptr != g_myEdrData) {
-                if (NT_SUCCESS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()))) {
-                    copiedProcessId.release();
-                }
-            }
-        }
+        AddNewProcessToBlacklistIfNeeded(reinterpret_cast<const ULONG&>(processId), createInfo);
     }
 
     Result<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(
@@ -142,6 +164,13 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
     RETURN_ON_BAD_STATUS(data->IoStatus.Status, FLT_POSTOP_FINISHED_PROCESSING);
     RETURN_ON_CONDITION(STATUS_REPARSE == data->IoStatus.Status, FLT_POSTOP_FINISHED_PROCESSING);
 
+    const ULONG processId = FltGetRequestorProcessId(data);
+
+    {
+        const Lock lock{ g_myEdrData->SpinLock };
+        RETURN_ON_CONDITION(!g_myEdrData->BlacklistProcessIds.containsElement(&processId), FLT_POSTOP_FINISHED_PROCESSING);
+    }
+
     AutoDeletedPointer<
         FLT_FILE_NAME_INFORMATION,
         decltype(FltReleaseFileNameInformation),
@@ -156,13 +185,6 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
         ),
         FLT_POSTOP_FINISHED_PROCESSING
     );
-
-    const ULONG processId = FltGetRequestorProcessId(data);
-
-    {
-        const Lock lock{ g_myEdrData->Mutex };
-        RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.containsElement(&processId), FLT_POSTOP_FINISHED_PROCESSING);
-    }
 
     Result<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(eventId, processId, &nameInfo->Name);
     RETURN_ON_BAD_RESULT(myEdrEvent, FLT_POSTOP_FINISHED_PROCESSING);
@@ -180,6 +202,8 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostCreate(
     FLT_POST_OPERATION_FLAGS flags
 )
 {
+    PAGED_CODE();
+
     UNREFERENCED_PARAMETER(fltObjects);
     UNREFERENCED_PARAMETER(completionContext);
     UNREFERENCED_PARAMETER(flags);
@@ -194,6 +218,8 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostWrite(
     FLT_POST_OPERATION_FLAGS flags
 )
 {
+    PAGED_CODE();
+
     UNREFERENCED_PARAMETER(fltObjects);
     UNREFERENCED_PARAMETER(completionContext);
     UNREFERENCED_PARAMETER(flags);
@@ -235,7 +261,7 @@ NTSTATUS HandleIoControl(PIRP irp)
     case SYSCTL_GET_EVENTS:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrEvent) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
-        const Lock lock{ g_myEdrData->Mutex };
+        const Lock lock{ g_myEdrData->SpinLock };
         Result<MyEdrEvent> myEdrEvent = g_myEdrData->EventQueue.popHead();
         RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
         *static_cast<MyEdrEvent*>(buffer) = *myEdrEvent;
@@ -245,10 +271,11 @@ NTSTATUS HandleIoControl(PIRP irp)
     case SYSCTL_ADD_BLACK:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrBlacklistProcess) > irpStackLocation->Parameters.DeviceIoControl.InputBufferLength, STATUS_INVALID_PARAMETER);
-        const Lock lock{ g_myEdrData->Mutex };
+        const Lock lock{ g_myEdrData->SpinLock };
         AutoDeletedPointer<UnicodeString> copiedUnicodeString = new UnicodeString;
         RETURN_ON_CONDITION(nullptr == copiedUnicodeString, STATUS_INSUFFICIENT_RESOURCES);
         RETURN_STATUS_ON_BAD_STATUS(copiedUnicodeString->copyFrom(static_cast<MyEdrBlacklistProcess*>(buffer)->Name));
+        RETURN_STATUS_ON_BAD_STATUS(copiedUnicodeString->toLowercase());
         RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessNames.insertElement(copiedUnicodeString.get()));
         copiedUnicodeString.release();
         irp->IoStatus.Information = 0;
@@ -268,6 +295,8 @@ NTSTATUS MyEdrDeviceControl(
     PIRP irp
 )
 {
+    PAGED_CODE();
+
     UNREFERENCED_PARAMETER(deviceObject);
 
     irp->IoStatus.Status = HandleIoControl(irp);
@@ -279,6 +308,8 @@ void DriverUnload(
     DRIVER_OBJECT* driverObject
 )
 {
+    PAGED_CODE();
+
     UNREFERENCED_PARAMETER(driverObject);
 
     delete g_myEdrData;
@@ -349,11 +380,9 @@ extern "C" NTSTATUS DriverEntry(
         &myEdrData->Device.get()
     ));
 
-    myEdrData->DeviceSymbolicLinkName = new UNICODE_STRING;
-    RETURN_ON_CONDITION(nullptr == myEdrData->DeviceSymbolicLinkName, STATUS_INSUFFICIENT_RESOURCES);
-    RtlInitUnicodeString(myEdrData->DeviceSymbolicLinkName.get(), MY_EDR_DOS_DEVICE_NAME);
-    RETURN_STATUS_ON_BAD_STATUS(IoCreateSymbolicLink(myEdrData->DeviceSymbolicLinkName.get(), &deviceName));
-    myEdrData->DeviceSymbolicLink = myEdrData->DeviceSymbolicLinkName.get();
+    RtlInitUnicodeString(&myEdrData->DeviceSymbolicLinkName, MY_EDR_DOS_DEVICE_NAME);
+    RETURN_STATUS_ON_BAD_STATUS(IoCreateSymbolicLink(&myEdrData->DeviceSymbolicLinkName, &deviceName));
+    myEdrData->DeviceSymbolicLink = &myEdrData->DeviceSymbolicLinkName;
 
     driverObject->MajorFunction[IRP_MJ_CLOSE] = driverObject->MajorFunction[IRP_MJ_CREATE] = MyEdrCreateClose;
     driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = MyEdrDeviceControl;
