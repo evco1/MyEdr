@@ -35,6 +35,6 @@ struct MyEdrEvent final {
 #pragma pack(push)
 #pragma pack(1)
 struct MyEdrBlacklistProcess final {
-    ULONG ProcessId;
+    WCHAR Name[MAX_PATH];
 };
 #pragma pack(pop)

@@ -8,6 +8,7 @@
 #include "Mutex.h"
 #include "Lock.h"
 #include "AvlTable.h"
+#include "UnicodeString.h"
 
 #include <wdm.h>
 
@@ -23,6 +24,7 @@ NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX pro
 struct MyEdrData final
 {
     Queue<MyEdrEvent> EventQueue;
+    AvlTable<UnicodeString> BlacklistProcessNames;
     AvlTable<ULONG> BlacklistProcessIds;
     Mutex Mutex;
     AutoDeletedPointer<
@@ -67,7 +69,7 @@ Result<MyEdrEvent> MyEdrCreateEvent(
 
 NTSTATUS MyEdrPushEventToQueue(MyEdrEvent* myEdrEvent)
 {
-    const Lock lock(g_myEdrData->Mutex);
+    const Lock lock{ g_myEdrData->Mutex };
 
     if (g_myEdrData->EventQueue.isFull()) {
         g_myEdrData->EventQueue.popHead();
@@ -86,9 +88,31 @@ void MyEdrCreateProcessNotifyRoutine(
 {
     UNREFERENCED_PARAMETER(process);
 
+    if (nullptr == createInfo)
+    {
+        const Lock lock = { g_myEdrData->Mutex };
+        g_myEdrData->BlacklistProcessIds.deleteElement(&reinterpret_cast<const ULONG&>(processId));
+    }
+    else
+    {
+        UnicodeString processName;
+        processName.copyFrom(*createInfo->ImageFileName);
+
+        const Lock lock = { g_myEdrData->Mutex };
+        if (g_myEdrData->BlacklistProcessNames.containsElement(&processName))
+        {
+            AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ reinterpret_cast<const ULONG&>(processId) };
+
+            if (NT_SUCCESS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get())))
+            {
+                copiedProcessId.release();
+            }
+        }
+    }
+
     Result<MyEdrEvent> myEdrEvent = MyEdrCreateEvent(
         nullptr == createInfo ? ProcessExit : ProcessCreate,
-        static_cast<ULONG>(reinterpret_cast<ULONG64>(processId)),
+        reinterpret_cast<const ULONG&>(processId),
         nullptr == createInfo ? nullptr : createInfo->ImageFileName
     );
 
@@ -124,7 +148,7 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
     const ULONG processId = FltGetRequestorProcessId(data);
 
     {
-        const Lock lock(g_myEdrData->Mutex);
+        const Lock lock{ g_myEdrData->Mutex };
         RETURN_ON_CONDITION(g_myEdrData->BlacklistProcessIds.containsElement(&processId), FLT_POSTOP_FINISHED_PROCESSING);
     }
 
@@ -210,7 +234,7 @@ NTSTATUS MyEdrDeviceControl(
     case SYSCTL_GET_EVENTS:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrEvent) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
-        const Lock lock(g_myEdrData->Mutex);
+        const Lock lock{ g_myEdrData->Mutex };
         Result<MyEdrEvent> myEdrEvent = g_myEdrData->EventQueue.popHead();
         RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
         *static_cast<MyEdrEvent*>(buffer) = *myEdrEvent;
@@ -219,11 +243,12 @@ NTSTATUS MyEdrDeviceControl(
     case SYSCTL_ADD_BLACK:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrBlacklistProcess) > irpStackLocation->Parameters.DeviceIoControl.InputBufferLength, STATUS_INVALID_PARAMETER);
-        const Lock lock(g_myEdrData->Mutex);
-        AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ static_cast<MyEdrBlacklistProcess*>(buffer)->ProcessId };
-        RETURN_ON_CONDITION(nullptr == copiedProcessId, STATUS_INSUFFICIENT_RESOURCES);
-        RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()));
-        copiedProcessId.release();
+        const Lock lock{ g_myEdrData->Mutex };
+        AutoDeletedPointer<UnicodeString> copiedUnicodeString = new UnicodeString;
+        RETURN_ON_CONDITION(nullptr == copiedUnicodeString, STATUS_INSUFFICIENT_RESOURCES);
+        RETURN_STATUS_ON_BAD_STATUS(copiedUnicodeString->copyFrom(static_cast<MyEdrBlacklistProcess*>(buffer)->Name));
+        RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessNames.insertElement(copiedUnicodeString.get()));
+        copiedUnicodeString.release();
         break;
     }
     default:

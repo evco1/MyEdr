@@ -1,10 +1,16 @@
 #include "Memory.h"
+#include "Debug.h"
 
 #include <wdm.h>
 
 void* __cdecl operator new(size_t size)
 {
     return allocate(size);
+}
+
+void* __cdecl operator new[](size_t size)
+{
+    return operator new(size);
 }
 
 void __cdecl operator delete(void* ptr, size_t size)
