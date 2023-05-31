@@ -61,6 +61,7 @@ template <class DataType>
 NTSTATUS AvlTable<DataType>::insertElement(DataType* data)
 {
 	RETURN_ON_CONDITION(nullptr == data, false);
+
 	RETURN_ON_CONDITION(
 		nullptr == RtlInsertElementGenericTableAvl(&m_table, &data, sizeof(DataType*), nullptr),
 		{ STATUS_MY_EDR_AVL_TABLE_INSERT_ELEMENT_FAILED }

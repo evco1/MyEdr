@@ -5,6 +5,7 @@
 #include "Queue.h"
 #include "Result.h"
 #include "AutoDeletedPointer.h"
+#include "Mutex.h"
 #include "SpinLock.h"
 #include "Lock.h"
 #include "AvlTable.h"
@@ -25,9 +26,21 @@ NTSTATUS CreateProcessNotifyRoutineDeleter(PCREATE_PROCESS_NOTIFY_ROUTINE_EX pro
 struct MyEdrData final
 {
     Queue<MyEdrEvent> EventQueue;
+
+    // Because it can be used from dispatch level
+    SpinLock EventQueueLockable;
+
     AvlTable<UnicodeString> BlacklistProcessNames;
+    
+    // Because it uses hash algorithm that dosent support dispatch level
+    // so we can't use a spin lock and it never called from dispatch level
+    Mutex BlacklistProcessNamesLockable;
+
+
     AvlTable<ULONG> BlacklistProcessIds;
-    SpinLock SpinLock;
+
+    // Because it can be used from dispatch level
+    SpinLock BlacklistProcessIdsLockable;
 
     AutoDeletedPointer<
         remove_reference_t<PCREATE_PROCESS_NOTIFY_ROUTINE_EX>,
@@ -81,7 +94,7 @@ Result<MyEdrEvent> MyEdrCreateEvent(
 
 NTSTATUS MyEdrPushEventToQueue(MyEdrEvent* myEdrEvent)
 {
-    const Lock lock{ g_myEdrData->SpinLock };
+    const Lock lock{ g_myEdrData->EventQueueLockable };
 
     if (g_myEdrData->EventQueue.isFull()) {
         g_myEdrData->EventQueue.popHead();
@@ -115,11 +128,19 @@ NTSTATUS AddNewProcessToBlacklistIfNeeded(
     RETURN_STATUS_ON_BAD_STATUS(copiedFileName.copyFrom(fileName));
     RETURN_STATUS_ON_BAD_STATUS(copiedFileName.toLowercase());
 
-    const Lock lock = { g_myEdrData->SpinLock };
-    RETURN_ON_CONDITION(!g_myEdrData->BlacklistProcessNames.containsElement(&copiedFileName), STATUS_SUCCESS);
+    {
+        const Lock lock = { g_myEdrData->BlacklistProcessNamesLockable };
+        RETURN_ON_CONDITION(!g_myEdrData->BlacklistProcessNames.containsElement(&copiedFileName), STATUS_SUCCESS);
+    }
+
     AutoDeletedPointer<ULONG> copiedProcessId = new ULONG{ processId };
     RETURN_ON_CONDITION(nullptr == g_myEdrData, STATUS_INSUFFICIENT_RESOURCES);
-    RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()));
+
+    {
+        const Lock lock = { g_myEdrData->BlacklistProcessIdsLockable };
+        RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessIds.insertElement(copiedProcessId.get()));
+    }
+
     copiedProcessId.release();
     return STATUS_SUCCESS;
 }
@@ -136,7 +157,7 @@ void MyEdrCreateProcessNotifyRoutine(
 
     if (nullptr == createInfo)
     {
-        const Lock lock = { g_myEdrData->SpinLock };
+        const Lock lock = { g_myEdrData->BlacklistProcessIdsLockable };
         g_myEdrData->BlacklistProcessIds.deleteElement(&reinterpret_cast<const ULONG&>(processId));
     }
     else
@@ -167,7 +188,7 @@ FLT_POSTOP_CALLBACK_STATUS HandleFilterCallback(
     const ULONG processId = FltGetRequestorProcessId(data);
 
     {
-        const Lock lock{ g_myEdrData->SpinLock };
+        const Lock lock{ g_myEdrData->BlacklistProcessIdsLockable };
         RETURN_ON_CONDITION(!g_myEdrData->BlacklistProcessIds.containsElement(&processId), FLT_POSTOP_FINISHED_PROCESSING);
     }
 
@@ -202,8 +223,6 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostCreate(
     FLT_POST_OPERATION_FLAGS flags
 )
 {
-    PAGED_CODE();
-
     UNREFERENCED_PARAMETER(fltObjects);
     UNREFERENCED_PARAMETER(completionContext);
     UNREFERENCED_PARAMETER(flags);
@@ -218,8 +237,6 @@ FLT_POSTOP_CALLBACK_STATUS MyEdrPostWrite(
     FLT_POST_OPERATION_FLAGS flags
 )
 {
-    PAGED_CODE();
-
     UNREFERENCED_PARAMETER(fltObjects);
     UNREFERENCED_PARAMETER(completionContext);
     UNREFERENCED_PARAMETER(flags);
@@ -261,8 +278,13 @@ NTSTATUS HandleIoControl(PIRP irp)
     case SYSCTL_GET_EVENTS:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrEvent) > irpStackLocation->Parameters.DeviceIoControl.OutputBufferLength, STATUS_INVALID_PARAMETER);
-        const Lock lock{ g_myEdrData->SpinLock };
-        Result<MyEdrEvent> myEdrEvent = g_myEdrData->EventQueue.popHead();
+        Result<MyEdrEvent> myEdrEvent;
+
+        {
+            const Lock lock{ g_myEdrData->EventQueueLockable };
+            myEdrEvent = g_myEdrData->EventQueue.popHead();
+        }
+
         RETURN_STATUS_ON_BAD_STATUS(myEdrEvent.getStatus());
         *static_cast<MyEdrEvent*>(buffer) = *myEdrEvent;
         irp->IoStatus.Information = sizeof(MyEdrEvent);
@@ -271,12 +293,16 @@ NTSTATUS HandleIoControl(PIRP irp)
     case SYSCTL_ADD_BLACK:
     {
         RETURN_ON_CONDITION(sizeof(MyEdrBlacklistProcess) > irpStackLocation->Parameters.DeviceIoControl.InputBufferLength, STATUS_INVALID_PARAMETER);
-        const Lock lock{ g_myEdrData->SpinLock };
         AutoDeletedPointer<UnicodeString> copiedUnicodeString = new UnicodeString;
         RETURN_ON_CONDITION(nullptr == copiedUnicodeString, STATUS_INSUFFICIENT_RESOURCES);
         RETURN_STATUS_ON_BAD_STATUS(copiedUnicodeString->copyFrom(static_cast<MyEdrBlacklistProcess*>(buffer)->Name));
         RETURN_STATUS_ON_BAD_STATUS(copiedUnicodeString->toLowercase());
-        RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessNames.insertElement(copiedUnicodeString.get()));
+
+        {
+            const Lock lock{ g_myEdrData->BlacklistProcessNamesLockable };
+            RETURN_STATUS_ON_BAD_STATUS(g_myEdrData->BlacklistProcessNames.insertElement(copiedUnicodeString.get()));
+        }
+
         copiedUnicodeString.release();
         irp->IoStatus.Information = 0;
         break;
