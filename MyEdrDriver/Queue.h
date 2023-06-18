@@ -75,6 +75,14 @@ Queue<DataType>& Queue<DataType>::operator=(Queue&& other)
 	if (this != &other)
 	{
 		clear();
+
+		// If other has no elements, then its head pointing to itself so we mustn't copy its head
+		if (0 == other.m_currentEntryCount)
+		{
+			return;
+		}
+
+		// Other's head just pointing to its elements so all we do is to copy it and initialize its head
 		m_maxEntryCount = other.m_maxEntryCount;
 		m_currentEntryCount = other.m_currentEntryCount;
 		m_head = other.m_head;
